@@ -1,0 +1,29 @@
+[
+  {
+    "id": "063911b5-81ed-4e48-aff3-83d3f606fff7",
+    "fullName": "Daniel Benavides",
+    "email": "daniel.benavides@roche.com",
+    "password": "$2b$10$ZVQxV6UQ1PzlmyG4i/trDupiDIcKzfTbyfNnYQyRStSefJKgzlDSS",
+    "passwordPlain": "Benecken1980",
+    "stamps": [
+      {
+        "id": "46ecd9e1-baae-4069-8156-e33c2794e29e",
+        "title": "Gym / Solo Workout",
+        "points": 1,
+        "method": "scan",
+        "categoryId": "gym",
+        "scanCode": "ROCHE-GYM-101",
+        "date": "2026-10-09T22:04:06.220Z"
+      },
+      {
+        "id": "c78a088c-7fb0-4917-85d1-9bf7384147b9",
+        "title": "Group Fitness Class",
+        "points": 2,
+        "method": "scan",
+        "categoryId": "group",
+        "scanCode": "",
+        "date": "2026-10-09T22:01:26.614Z"
+      }
+    ]
+  }
+]

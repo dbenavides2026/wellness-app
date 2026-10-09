@@ -1,0 +1,20 @@
+[
+  {
+    "id": "feefde38-5882-4a23-af9a-454732aa49e9",
+    "author": "Roche Wellness Team",
+    "role": "superadmin",
+    "message": "This is a test announcement, welcome to our new platform",
+    "image": "",
+    "isAnnouncement": true,
+    "createdAt": "2026-10-09T19:15:25.648Z"
+  },
+  {
+    "id": "1e2c2a15-1663-4475-b905-ad4b9ba8ead0",
+    "author": "Roche Wellness Team",
+    "role": "admin",
+    "message": "Welcome to the Wellness Community — share wins, workouts, and encouragement with the team.",
+    "image": "",
+    "isAnnouncement": true,
+    "createdAt": "2026-10-09T19:10:14.679Z"
+  }
+]

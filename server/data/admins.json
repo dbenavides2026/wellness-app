@@ -1,0 +1,35 @@
+[
+  {
+    "id": "9b1e7895-880e-4d1e-aae3-5dbabdefd59b",
+    "fullName": "Admin One",
+    "email": "admin1@roche.com",
+    "password": "$2b$10$2CD0PJO/R.jNUo8oX.WC..BSrZQgxPQh2ILsSqooJnV2HksjeZarG",
+    "role": "admin",
+    "createdAt": "2026-10-09T15:00:12.274Z"
+  },
+  {
+    "id": "6c1b8ed7-9bf5-438c-9321-47523e6d739c",
+    "fullName": "Super Admin",
+    "email": "superadmin@roche.com",
+    "password": "$2b$10$4U6u1WhO/T/KLjezowEcPuD4gtVsQuux0J5hQGkDv9DPR3bPebCKK",
+    "role": "superadmin",
+    "createdAt": "2026-10-09T15:07:11.203Z",
+    "passwordPlain": "DigitalPassport*2026"
+  },
+  {
+    "id": "ca5cf07b-f08d-49de-b1e6-59be2249a929",
+    "fullName": "Regular User",
+    "email": "newadmin@roche.com",
+    "password": "$2b$10$9M2xOc7y/9E7yLVdkn0LrujEb/ZlZwtc.lk4sriKkaHFCaS.l2mC.",
+    "role": "admin",
+    "createdAt": "2026-10-09T15:07:18.705Z"
+  },
+  {
+    "id": "31c78fd3-bdaa-42c4-beb9-5b04627c6a28",
+    "fullName": "Daniel Benavides",
+    "email": "daniel.benavides@roche.com",
+    "password": "$2b$10$Hl4hGAzapU5rzkaHngzNF.P22NwZ.ZiIDgxO.Q2cDFm50WAaFYoMO",
+    "role": "admin",
+    "createdAt": "2026-10-09T15:10:04.167Z"
+  }
+]
