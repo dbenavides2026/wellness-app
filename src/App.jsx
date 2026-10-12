@@ -10,7 +10,7 @@ import './App.css';
 const CURRENT_USER_KEY = 'wellness-passport-current-user';
 const ADMIN_USER_KEY = 'wellness-passport-admin-user';
 
-const categories = [
+const defaultCategories = [
   { id: 'gym', title: 'Gym / Solo Workout', points: 1, iconType: 'dumbbell', scanCode: 'WELLNESS-GYM-101', proofPrompt: 'Upload a photo of your workout setup.' },
   { id: 'group', title: 'Group Fitness Class', points: 2, iconType: 'users', scanCode: 'WELLNESS-GROUP-202', proofPrompt: 'Upload a photo of class attendance.' },
   { id: 'sports', title: 'Sports & Outdoor Game', points: 2, iconType: 'trophy', scanCode: 'WELLNESS-SPORTS-303', proofPrompt: 'Upload a photo of your activity.' }
@@ -74,7 +74,6 @@ export default function App() {
   const points = currentUser?.stamps?.reduce((total, stamp) => total + Number(stamp.points || 0), 0) || 0;
   const noCampaignMessage = 'A new challenge campaign has not started yet. Activity logging is disabled until the wellness team creates and activates a campaign.';
 
-  // Comprehensive Refresh & State Re-hydration
   const refreshAllData = async () => {
     try {
       const [parts, comms, chs, status] = await Promise.all([
@@ -91,7 +90,6 @@ export default function App() {
       setSpecialChallenges(chs.challenges || []);
       setChallengeStatus(status.status || { isActive: false, title: 'No active challenge' });
 
-      // Automatically sync logged-in user profile from backend without requiring re-login
       if (currentUser?.id) {
         const freshUser = updatedParticipants.find((p) => p.id === currentUser.id);
         if (freshUser) {
@@ -114,15 +112,12 @@ export default function App() {
     } catch (e) { console.error('Admin data error', e); }
   };
 
-  // Initial load + Polling Interval for live updates
   useEffect(() => {
     refreshAllData();
-
-    // Auto-poll backend every 6 seconds so user state, stamps, and new activities refresh automatically
     const interval = setInterval(() => {
       refreshAllData();
       if (adminUser) refreshAdminData();
-    }, 6000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [currentUser?.id, adminUser?.id]);
@@ -210,120 +205,50 @@ export default function App() {
     } catch (err) { setAdminMessage(err.message); }
   };
 
-  const addStamp = async (category) => {
+  const handleSaveSpecialChallenge = async () => {
+    const title = challengeForm.title.trim();
+    const description = challengeForm.description.trim();
+    if (!title || !description) { setAdminMessage('Title and description are required.'); return; }
+
+    try {
+      const method = editingChallengeId ? 'PUT' : 'POST';
+      const url = editingChallengeId ? `/api/admin/challenges/${editingChallengeId}` : '/api/admin/challenges';
+      await fetchJson(url, {
+        method,
+        body: JSON.stringify({
+          ...challengeForm,
+          points: Number(challengeForm.points) || 10,
+          proofPrompt: challengeForm.proofPrompt || 'Upload a photo.'
+        })
+      });
+      setChallengeForm({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
+      setEditingChallengeId(null);
+      setAdminMessage('Special activity saved successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const addStamp = async (activity) => {
     if (!currentUser) return;
     try {
       const res = await fetchJson(`/api/participants/${currentUser.id}/stamps`, {
         method: 'POST',
         body: JSON.stringify({
-          title: category.title,
-          points: category.points,
-          categoryId: category.id,
-          scanCode: scanEntries[category.id] || category.scanCode || ''
+          title: activity.title,
+          points: activity.points,
+          categoryId: activity.id || 'special',
+          scanCode: scanEntries[activity.id] || activity.scanCode || ''
         })
       });
       setCurrentUser(res.user); setFormError('');
-      setProofs((p) => { const n = { ...p }; delete n[category.id]; return n; });
-      setScanEntries((p) => { const n = { ...p }; delete n[category.id]; return n; });
+      setProofs((p) => { const n = { ...p }; delete n[activity.id]; return n; });
+      setScanEntries((p) => { const n = { ...p }; delete n[activity.id]; return n; });
       confetti({ particleCount: 55, spread: 60, origin: { y: 0.8 } });
       await refreshAllData();
     } catch (err) { setFormError(err.message); }
   };
 
-  // View Renderings
   if (screen === 'login') return (
     <div className="auth-app"><div className="auth-card">
-      <div className="auth-header"><h1>Wellness Passport</h1><p>Sign in to track activity.</p></div>
-      <form className="auth-form" onSubmit={handleLogin}>
-        <label><span className="input-label"><Mail className="input-icon" /> Email</span><input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required /></label>
-        <label><span className="input-label"><Lock className="input-icon" /> Password</span><input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required /></label>
-        {authMessage && <p className="auth-message error">{authMessage}</p>}
-        <button type="submit" className="primary-button"><LogIn className="button-icon" /> Log in</button>
-      </form>
-      <div className="auth-divider"><span>or</span></div>
-      <button className="secondary-button" onClick={() => setScreen('register')}><UserPlus className="button-icon" /> Create account</button>
-      <button className="secondary-button" onClick={() => setScreen('admin-login')}><ShieldCheck className="button-icon" /> Admin portal</button>
-    </div></div>
-  );
-
-  if (screen === 'register') return (
-    <div className="auth-app"><div className="auth-card">
-      <div className="auth-header"><h1>Create Account</h1></div>
-      <form className="auth-form" onSubmit={handleRegister}>
-        <label><span className="input-label">Full Name</span><input type="text" value={registerForm.fullName} onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })} required /></label>
-        <label><span className="input-label">Email</span><input type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} required /></label>
-        <label><span className="input-label">Password</span><input type="password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} required /></label>
-        <label><span className="input-label">Confirm Password</span><input type="password" value={registerForm.confirmPassword} onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })} required /></label>
-        {registrationMessage && <p className="auth-message error">{registrationMessage}</p>}
-        <button type="submit" className="primary-button">Register</button>
-      </form>
-      <button className="secondary-button" onClick={() => setScreen('login')}>Back to login</button>
-    </div></div>
-  );
-
-  if (screen === 'admin-login') return (
-    <div className="auth-app"><div className="auth-card">
-      <div className="auth-header"><h1>Admin Portal</h1></div>
-      <form className="auth-form" onSubmit={handleAdminLogin}>
-        <label><span className="input-label">Admin Email</span><input type="email" value={adminLoginForm.email} onChange={(e) => setAdminLoginForm({ ...adminLoginForm, email: e.target.value })} required /></label>
-        <label><span className="input-label">Password</span><input type="password" value={adminLoginForm.password} onChange={(e) => setAdminLoginForm({ ...adminLoginForm, password: e.target.value })} required /></label>
-        {adminMessage && <p className="auth-message error">{adminMessage}</p>}
-        <button type="submit" className="primary-button"><ShieldCheck className="button-icon" /> Log in as Admin</button>
-      </form>
-      <button className="secondary-button" onClick={() => setScreen('login')}>Back to login</button>
-    </div></div>
-  );
-
-  if (screen === 'admin-dashboard') return (
-    <div className="admin-app"><div className="admin-shell">
-      <header className="admin-header">
-        <h1>Admin Dashboard</h1>
-        <button className="logout-button" onClick={() => { setAdminUser(null); setScreen('login'); }}><LogOut /> Log out</button>
-      </header>
-      <nav className="admin-top-nav">
-        <button className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Overview</button>
-        <button className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Challenges</button>
-        <button className={adminTab === 'qr' ? 'active' : ''} onClick={() => setAdminTab('qr')}>Category QRs</button>
-      </nav>
-      {adminTab === 'qr' && (
-        <section className="admin-panel">
-          <div className="qr-grid">
-            {adminQrCodes.map((item) => (
-              <div key={item.id} className="qr-card">
-                <img src={item.qrCode} alt={item.title} />
-                <strong>{item.title}</strong>
-                <small>{item.code}</small>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </div></div>
-  );
-
-  return (
-    <div className="wellness-app"><div className="passport-shell">
-      <header className="passport-header">
-        <h1>Welcome, {currentUser?.fullName}</h1>
-        <button className="logout-button" onClick={() => { setCurrentUser(null); setScreen('login'); }}><LogOut /> Log out</button>
-        <div className="points-panel"><strong>{points} pts</strong></div>
-      </header>
-      <main className="category-list">
-        {categories.map((cat) => (
-          <article key={cat.id} className="category-card">
-            <h2>{cat.title}</h2>
-            <button className="scan-camera-button" onClick={() => setScannerCategoryId(cat.id)}><ScanLine /> Scan QR Code</button>
-            <button className="log-button" onClick={() => addStamp(cat)} disabled={!challengeStatus.isActive}><PlusCircle /> Log Activity</button>
-          </article>
-        ))}
-      </main>
-      {scannerCategoryId && (
-        <div className="scanner-modal"><div className="scanner-card">
-          <button className="close-scanner" onClick={() => setScannerCategoryId(null)}>Close</button>
-          <video ref={videoRef} className="scanner-video" autoPlay playsInline muted />
-          <canvas ref={canvasRef} hidden />
-        </div></div>
-      )}
-    </div></div>
-  );
-}
+      <div className="
