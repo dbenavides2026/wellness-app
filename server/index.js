@@ -49,6 +49,7 @@ const writeCommunityPosts = (p) => writeJson(communityDbPath, p);
 const readSpecialChallenges = () => readJson(specialChallengesDbPath, defaultChallenges);
 const writeSpecialChallenges = (c) => writeJson(specialChallengesDbPath, c);
 const readChallengeStatus = () => readJson(challengeStatusPath, defaultStatus);
+const writeChallengeStatus = (s) => writeJson(challengeStatusPath, s);
 
 const SUPERADMIN_EMAIL = 'superadmin@roche.com';
 const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
@@ -61,9 +62,9 @@ const sanitizeUser = (user) => {
 const normalizeEmail = (e = '') => String(e).trim().toLowerCase();
 
 const categoryQrConfigurations = [
-  { id: 'gym', title: 'Gym / Solo Workout', points: 1, code: 'ROCHE-GYM-101' },
-  { id: 'group', title: 'Group Fitness Class', points: 2, code: 'ROCHE-GROUP-202' },
-  { id: 'sports', title: 'Sports & Outdoor Game', points: 2, code: 'ROCHE-SPORTS-303' }
+  { id: 'gym', categoryId: 'gym', title: 'Gym / Solo Workout', points: 1, code: 'ROCHE-GYM-101', scanCode: 'ROCHE-GYM-101', isCategory: true },
+  { id: 'group', categoryId: 'group', title: 'Group Fitness Class', points: 2, code: 'ROCHE-GROUP-202', scanCode: 'ROCHE-GROUP-202', isCategory: true },
+  { id: 'sports', categoryId: 'sports', title: 'Sports & Outdoor Game', points: 2, code: 'ROCHE-SPORTS-303', scanCode: 'ROCHE-SPORTS-303', isCategory: true }
 ];
 
 const buildQrCatalog = async () => {
@@ -75,6 +76,8 @@ const buildQrCatalog = async () => {
         title: ch.title,
         points: Number(ch.points || 10),
         code: ch.scanCode,
+        scanCode: ch.scanCode,
+        isCategory: false,
         qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#0f172a', light: '#ffffff' } })
       }))
     );
@@ -143,17 +146,17 @@ app.post('/api/admin/login', async (req, res) => {
   } catch (err) { return res.status(500).json({ message: err.message }); }
 });
 
-// Generar y entregar catálogo completo de códigos QR para el Admin Portal
+// Catálogo de QR codes estructurado para el Admin Portal
 app.get('/api/admin/qr-codes', async (_req, res) => {
   try {
     const qrCodes = await buildQrCatalog();
-    return res.json({ qrCodes });
+    return res.json({ qrCodes, categories: categoryQrConfigurations });
   } catch (err) {
     return res.status(500).json({ message: 'Unable to generate QR codes', error: err.message });
   }
 });
 
-// Estadísticas del Admin Portal
+// Estadísticas del Admin Dashboard
 app.get('/api/admin/stats', (_req, res) => {
   try {
     const participants = readParticipants();
@@ -177,7 +180,7 @@ app.get('/api/admin/stats', (_req, res) => {
   } catch (err) { return res.status(500).json({ message: err.message }); }
 });
 
-// Guardar actividad (Sello / Stamp desde QR)
+// Registrar actividad (Sello / Stamp desde QR)
 app.post('/api/participants/:id/stamps', (req, res) => {
   try {
     const { id } = req.params;
@@ -203,9 +206,53 @@ app.post('/api/participants/:id/stamps', (req, res) => {
   } catch (err) { return res.status(500).json({ message: err.message }); }
 });
 
+// Administración de Retos
 app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
+
+app.post('/api/admin/challenges', (req, res) => {
+  try {
+    const title = String(req.body.title || '').trim();
+    const description = String(req.body.description || '').trim();
+    if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
+
+    const challenges = readSpecialChallenges();
+    const challenge = { id: crypto.randomUUID(), title, description, points: Number(req.body.points || 10), scanCode: String(req.body.scanCode || `ROCHE-SPECIAL-${crypto.randomUUID().slice(0, 8)}`).toUpperCase(), proofPrompt: String(req.body.proofPrompt || 'Upload a photo.').trim() };
+    challenges.unshift(challenge);
+    writeSpecialChallenges(challenges);
+    return res.status(201).json({ challenge });
+  } catch (err) { return res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/admin/challenges/:id', (req, res) => {
+  try {
+    const challenges = readSpecialChallenges().filter((c) => c.id !== req.params.id);
+    writeSpecialChallenges(challenges);
+    return res.json({ deleted: true, count: challenges.length });
+  } catch (err) { return res.status(500).json({ message: err.message }); }
+});
+
+// Administración de Comunidad
 app.get('/api/admin/community', (_req, res) => res.json({ posts: readCommunityPosts() }));
+
+app.post('/api/admin/community', (req, res) => {
+  try {
+    const message = String(req.body.message || '').trim();
+    const posts = readCommunityPosts();
+    const post = { id: crypto.randomUUID(), author: 'Roche Wellness Team', role: 'admin', message, image: req.body.image || '', isAnnouncement: Boolean(req.body.isAnnouncement), createdAt: new Date().toISOString() };
+    posts.unshift(post);
+    writeCommunityPosts(posts);
+    return res.status(201).json({ post });
+  } catch (err) { return res.status(500).json({ message: err.message }); }
+});
+
+app.delete('/api/admin/community/:id', (req, res) => {
+  try {
+    const posts = readCommunityPosts().filter((p) => p.id !== req.params.id);
+    writeCommunityPosts(posts);
+    return res.json({ deleted: true, count: posts.length });
+  } catch (err) { return res.status(500).json({ message: err.message }); }
+});
 
 // --- SERVIR FRONTEND ESTÁTICO DE REACT (EXPRESS 5) ---
 const distPath = path.join(__dirname, '..', 'dist');
