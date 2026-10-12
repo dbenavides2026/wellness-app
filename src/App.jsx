@@ -20,7 +20,8 @@ import {
   Upload,
   UserPlus,
   Users,
-  Mountain
+  Mountain,
+  User
 } from 'lucide-react';
 import './App.css';
 
@@ -161,6 +162,15 @@ export default function App() {
   const [scannerError, setScannerError] = useState('');
   const [formError, setFormError] = useState('');
 
+  // Modals / Profile State
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ fullName: '', email: '', password: '', profileImage: '' });
+  const [profileMsg, setProfileMsg] = useState('');
+
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -246,6 +256,12 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       window.localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+      setProfileDraft({
+        fullName: currentUser.fullName || '',
+        email: currentUser.email || '',
+        password: '',
+        profileImage: currentUser.profileImage || ''
+      });
     } else {
       window.localStorage.removeItem(CURRENT_USER_KEY);
     }
@@ -403,6 +419,45 @@ export default function App() {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotMsg('');
+    try {
+      const res = await fetchJson('/api/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: forgotEmail })
+      });
+      setForgotMsg(`Success: ${res.message} (${res.password})`);
+    } catch (err) {
+      setForgotMsg(err.message || 'Unable to retrieve password.');
+    }
+  };
+
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    setProfileMsg('');
+    try {
+      const res = await fetchJson(`/api/participants/${currentUser.id}/profile`, {
+        method: 'PUT',
+        body: JSON.stringify(profileDraft)
+      });
+      setCurrentUser(res.user);
+      setProfileMsg('Profile updated successfully!');
+      await refreshAllData();
+    } catch (err) {
+      setProfileMsg(err.message || 'Unable to update profile.');
+    }
+  };
+
+  const handleProfileImageUpload = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileDraft((prev) => ({ ...prev, profileImage: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAdminLogin = async (e) => {
     e.preventDefault();
     try {
@@ -464,6 +519,30 @@ export default function App() {
     }
   };
 
+  const handleDeleteSpecialActivity = async (id) => {
+    if (!window.confirm('Delete this special activity?')) return;
+    try {
+      await fetchJson(`/api/admin/challenges/${id}`, { method: 'DELETE' });
+      setAdminMessage('Special activity deleted successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete activity.');
+    }
+  };
+
+  const handleDeleteHikingActivity = async (id) => {
+    if (!window.confirm('Delete this hiking activity?')) return;
+    try {
+      await fetchJson(`/api/admin/hiking-challenges/${id}`, { method: 'DELETE' });
+      setAdminMessage('Hiking activity deleted successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete hiking activity.');
+    }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     setScreen('login');
@@ -472,6 +551,7 @@ export default function App() {
     setProofs({});
     setScanEntries({});
     setCategorySelections({});
+    setProfileOpen(false);
   };
 
   const handleAdminLogout = () => {
@@ -673,12 +753,33 @@ export default function App() {
             </label>
             {authMessage && <p className="auth-message error">{authMessage}</p>}
             <button type="submit" className="primary-button"><LogIn className="button-icon" /> Log in</button>
+            <button type="button" className="secondary-button" style={{ marginTop: '0.5rem', background: 'transparent', border: 'none', color: '#0b41cd', cursor: 'pointer' }} onClick={() => setForgotPasswordOpen(true)}>
+              Forgot password?
+            </button>
           </form>
           <div className="auth-divider"><span>or</span></div>
           <button type="button" className="secondary-button" onClick={() => setScreen('register')}><UserPlus className="button-icon" /> Create an account</button>
           <div className="auth-divider small-gap"><span>admin access</span></div>
           <button type="button" className="secondary-button" onClick={() => setScreen('admin-login')}><ShieldCheck className="button-icon" /> Admin portal</button>
         </div>
+
+        {/* FORGOT PASSWORD MODAL */}
+        {forgotPasswordOpen && (
+          <div className="scanner-modal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="scanner-card" style={{ padding: '1.5rem', maxWidth: '400px', width: '100%', background: '#fff', borderRadius: '12px' }}>
+              <h3>Forgot Password</h3>
+              <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Enter your email to retrieve your password from the database.</p>
+              <form onSubmit={handleForgotPassword} style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <input type="email" placeholder="registered@email.com" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                {forgotMsg && <p className="auth-message" style={{ fontSize: '0.85rem' }}>{forgotMsg}</p>}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="submit" className="primary-button">Retrieve Password</button>
+                  <button type="button" className="secondary-button" onClick={() => { setForgotPasswordOpen(false); setForgotMsg(''); }}>Close</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -920,10 +1021,13 @@ export default function App() {
                 <div className="special-challenges-list">
                   {specialChallenges.length === 0 ? <div className="empty-state">No special activities configured yet.</div> : (
                     specialChallenges.map((ch) => (
-                      <div key={ch.id} className="admin-community-item">
-                        <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
-                        <p>{ch.description}</p>
-                        <small className="challenge-code">{ch.scanCode}</small>
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <small className="challenge-code">{ch.scanCode}</small>
+                        </div>
+                        <button type="button" className="icon-button delete-button" onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
                   )}
@@ -958,10 +1062,13 @@ export default function App() {
                 <div className="special-challenges-list">
                   {hikingChallenges.length === 0 ? <div className="empty-state">No hiking activities configured yet.</div> : (
                     hikingChallenges.map((ch) => (
-                      <div key={ch.id} className="admin-community-item">
-                        <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
-                        <p>{ch.description}</p>
-                        <small className="challenge-code">{ch.scanCode}</small>
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <small className="challenge-code">{ch.scanCode}</small>
+                        </div>
+                        <button type="button" className="icon-button delete-button" onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
                   )}
@@ -1039,7 +1146,10 @@ export default function App() {
                       <p className="eyebrow">Wellness Passport</p>
                       <h1>Welcome, {currentUser?.fullName || 'participant'}</h1>
                     </div>
-                    <div className="header-actions">
+                    <div className="header-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                      <button type="button" className="secondary-button" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} onClick={() => setProfileOpen(true)}>
+                        <User size={16} /> Profile
+                      </button>
                       <button type="button" className="logout-button" onClick={handleLogout}><LogOut className="button-icon" /> Log out</button>
                     </div>
                   </div>
@@ -1357,6 +1467,32 @@ export default function App() {
         </div>
       </div>
 
+      {/* USER PROFILE MODAL */}
+      {profileOpen && (
+        <div className="scanner-modal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="scanner-card" style={{ padding: '1.5rem', maxWidth: '420px', width: '100%', background: '#fff', borderRadius: '12px' }}>
+            <h3>User Profile</h3>
+            {profileDraft.profileImage && (
+              <div style={{ textAlign: 'center', margin: '1rem 0' }}>
+                <img src={profileDraft.profileImage} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} />
+              </div>
+            )}
+            <form onSubmit={handleProfileSave} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <label><span className="input-label">Full Name</span><input type="text" value={profileDraft.fullName} onChange={(e) => setProfileDraft({ ...profileDraft, fullName: e.target.value })} required style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} /></label>
+              <label><span className="input-label">Email</span><input type="email" value={profileDraft.email} onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })} required style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} /></label>
+              <label><span className="input-label">Upload Profile Picture</span><input type="file" accept="image/*" onChange={(e) => handleProfileImageUpload(e.target.files?.[0])} style={{ fontSize: '0.85rem' }} /></label>
+              <label><span className="input-label">Reset Password</span><input type="password" placeholder="New Password (min 6 chars)" value={profileDraft.password} onChange={(e) => setProfileDraft({ ...profileDraft, password: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} /></label>
+              {profileMsg && <p className="auth-message success" style={{ fontSize: '0.85rem' }}>{profileMsg}</p>}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button type="submit" className="primary-button">Save Changes</button>
+                <button type="button" className="secondary-button" onClick={() => setProfileOpen(false)}>Close</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SCANNER MODAL */}
       {scannerCategoryId && (
         <div className="scanner-modal">
           <div className="scanner-card">
