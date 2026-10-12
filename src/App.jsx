@@ -226,6 +226,40 @@ export default function App() {
     }
   }, [currentUser, adminUser, screen]);
 
+  // FUNCIÓN DE GUARDADO DIRECTO CON CÓDIGO
+  const addStampWithCode = async (activity, directCode = '') => {
+    if (!currentUser) return;
+    const codeToSend = directCode || scanEntries[activity.id] || activity.scanCode || '';
+
+    try {
+      const res = await fetchJson(`/api/participants/${currentUser.id}/stamps`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title: activity.title,
+          points: activity.points,
+          categoryId: activity.id || 'general',
+          scanCode: codeToSend
+        })
+      });
+
+      if (res.user) {
+        setCurrentUser(res.user);
+        setFormError('');
+        setProofs((p) => { const n = { ...p }; delete n[activity.id]; return n; });
+        setScanEntries((p) => { const n = { ...p }; delete n[activity.id]; return n; });
+        confetti({ particleCount: 55, spread: 60, origin: { y: 0.8 } });
+        await refreshAllData();
+      }
+    } catch (err) {
+      setFormError(err.message || 'Unable to save activity.');
+    }
+  };
+
+  const addStamp = (activity) => {
+    addStampWithCode(activity, scanEntries[activity.id]);
+  };
+
+  // ESCÁNER QR CON GUARDADO AUTOMÁTICO
   useEffect(() => {
     if (!scannerCategoryId) return undefined;
     let animId = 0, cancelled = false;
@@ -256,6 +290,12 @@ export default function App() {
           stopStream();
           setScannerCategoryId(null);
           setScannerError('');
+
+          const targetCategory = categories.find((cat) => cat.id === scannerCategoryId)
+            || specialChallenges.find((sc) => sc.id === scannerCategoryId)
+            || { id: scannerCategoryId, title: 'QR Check-in', points: 1 };
+
+          addStampWithCode(targetCategory, val);
           return;
         }
       }
@@ -462,29 +502,6 @@ export default function App() {
     }
   };
 
-  const addStamp = async (activity) => {
-    if (!currentUser) return;
-    try {
-      const res = await fetchJson(`/api/participants/${currentUser.id}/stamps`, {
-        method: 'POST',
-        body: JSON.stringify({
-          title: activity.title,
-          points: activity.points,
-          categoryId: activity.id || 'special',
-          scanCode: scanEntries[activity.id] || activity.scanCode || ''
-        })
-      });
-      setCurrentUser(res.user);
-      setFormError('');
-      setProofs((p) => { const n = { ...p }; delete n[activity.id]; return n; });
-      setScanEntries((p) => { const n = { ...p }; delete n[activity.id]; return n; });
-      confetti({ particleCount: 55, spread: 60, origin: { y: 0.8 } });
-      await refreshAllData();
-    } catch (err) {
-      setFormError(err.message);
-    }
-  };
-
   const getStampBadge = (title) => {
     const normalized = String(title || '').toLowerCase();
     if (normalized.includes('challenge') || normalized.includes('sprint') || normalized.includes('boost') || normalized.includes('outdoor') || normalized.includes('move')) {
@@ -573,7 +590,6 @@ export default function App() {
 
   if (screen === 'admin-dashboard') {
     const stats = adminStats?.stats || {};
-    const recentActivity = adminStats?.recentActivity || [];
 
     return (
       <div className="admin-app">
