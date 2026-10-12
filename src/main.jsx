@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
-// Force clear Service Worker and Cache Storage for iOS/Android home screen shortcuts
+// Unregister service workers and clear cache for mobile shortcuts
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     for (let registration of registrations) {
