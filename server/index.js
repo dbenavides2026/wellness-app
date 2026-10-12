@@ -1,12 +1,3 @@
-The deployment error `SyntaxError: missing ) after argument list` on line 434 of `server/index.js` happened because `server/index.js` was cut off mid-line (`const title = String(req.body...`) when pasted into GitHub.
-
-Here is the complete, valid, and fully closed **`server/index.js`** file.
-
-### `server/index.js`
-
-Replace **all content** in `server/index.js` on GitHub with this complete code:
-
-```javascript
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
@@ -496,5 +487,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-```
