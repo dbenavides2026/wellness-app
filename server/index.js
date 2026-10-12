@@ -690,7 +690,6 @@ app.post('/api/admin/challenge-status/end', (_req, res) => {
   }
 });
 
-// ADD SPECIAL ACTIVITY
 app.post('/api/admin/challenges', (req, res) => {
   try {
     const title = String(req.body.title || req.body.name || '').trim();
@@ -824,15 +823,11 @@ app.delete('/api/admin/community/:id', (req, res) => {
   }
 });
 
+// LOG ACTIVITY / SAVE STAMPS (FLEXIBLE PAYLOAD)
 app.post('/api/participants/:id/stamps', (req, res) => {
   try {
     const { id } = req.params;
-    const { title, points, method, categoryId, date, scanCode } = req.body;
-    const parsedPoints = Number(points || 0);
-
-    if (!title || !categoryId) {
-      return res.status(400).json({ message: 'Activity details are missing.' });
-    }
+    const { scanCode, method, date } = req.body;
 
     const status = readChallengeStatus();
     if (!status || !status.isActive) {
@@ -848,20 +843,51 @@ app.post('/api/participants/:id/stamps', (req, res) => {
       return res.status(404).json({ message: 'Participant not found.' });
     }
 
+    const cleanScanCode = String(scanCode || req.body.code || '').trim().toUpperCase();
+
+    // Map scanned code against internal catalogs if title or categoryId is missing
+    let title = String(req.body.title || '').trim();
+    let categoryId = String(req.body.categoryId || '').trim();
+    let points = Number(req.body.points || 0);
+
+    // 1. Look in Category QR Configurations
+    const matchedCategory = categoryQrConfigurations.find((cat) => cat.scanCode === cleanScanCode || cat.code === cleanScanCode);
+    if (matchedCategory) {
+      if (!title) title = matchedCategory.title;
+      if (!categoryId) categoryId = matchedCategory.id;
+      if (!points) points = matchedCategory.points;
+    }
+
+    // 2. Look in Special Challenges
+    if (!matchedCategory) {
+      const specialChallenges = readSpecialChallenges();
+      const matchedSpecial = specialChallenges.find((ch) => ch.scanCode === cleanScanCode);
+      if (matchedSpecial) {
+        if (!title) title = matchedSpecial.title;
+        if (!categoryId) categoryId = 'special';
+        if (!points) points = matchedSpecial.points;
+      }
+    }
+
+    // Fallbacks
+    if (!title) title = 'Activity Logged';
+    if (!categoryId) categoryId = 'general';
+    if (!points || points <= 0) points = 1;
+
     const stamp = {
       id: crypto.randomUUID(),
       title,
-      points: parsedPoints,
-      method: method || 'upload',
+      points,
+      method: method || 'qr',
       categoryId,
-      scanCode: String(scanCode || '').trim().toUpperCase() || '',
+      scanCode: cleanScanCode,
       date: date || new Date().toISOString()
     };
 
     participants[participantIndex].stamps = [stamp, ...(participants[participantIndex].stamps || [])];
     writeParticipants(participants);
 
-    return res.json({ user: sanitizeUser(participants[participantIndex]) });
+    return res.json({ user: sanitizeUser(participants[participantIndex]), stamp });
   } catch (error) {
     return res.status(500).json({ message: 'Unable to save activity.', error: error.message });
   }
