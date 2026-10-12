@@ -164,9 +164,13 @@ export default function App() {
   const streamRef = useRef(null);
 
   const stamps = currentUser?.stamps || [];
-  const wellnessPoints = stamps.filter(s => !s.scanCode?.startsWith('HIKING-') && !s.scanCode?.startsWith('RUNNING-')).reduce((sum, s) => sum + Number(s.points || 0), 0);
-  const hikingPoints = stamps.filter(s => s.scanCode?.startsWith('HIKING-')).reduce((sum, s) => sum + Number(s.points || 0), 0);
-  const runningPoints = stamps.filter(s => s.scanCode?.startsWith('RUNNING-')).reduce((sum, s) => sum + Number(s.points || 0), 0);
+  const wellnessStamps = stamps.filter(s => !s.scanCode?.startsWith('HIKING-') && !s.scanCode?.startsWith('RUNNING-'));
+  const hikingStamps = stamps.filter(s => s.scanCode?.startsWith('HIKING-'));
+  const runningStamps = stamps.filter(s => s.scanCode?.startsWith('RUNNING-'));
+
+  const wellnessPoints = wellnessStamps.reduce((sum, s) => sum + Number(s.points || 0), 0);
+  const hikingPoints = hikingStamps.reduce((sum, s) => sum + Number(s.points || 0), 0);
+  const runningPoints = runningStamps.reduce((sum, s) => sum + Number(s.points || 0), 0);
   const totalPoints = wellnessPoints + hikingPoints + runningPoints;
 
   const refreshAllData = async () => {
@@ -686,81 +690,6 @@ export default function App() {
     }
   };
 
-  const handleStartChallenge = async () => {
-    try {
-      const response = await fetchJson('/api/admin/challenge-status/start', {
-        method: 'POST',
-        body: JSON.stringify({ title: 'Active Wellness Challenge Campaign' })
-      });
-      setChallengeStatus(response.status || challengeStatus);
-      setAdminMessage('New Wellness Challenge campaign started.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to start campaign.');
-    }
-  };
-
-  const handleEndChallenge = async () => {
-    try {
-      const response = await fetchJson('/api/admin/challenge-status/end', { method: 'POST' });
-      setChallengeStatus(response.status || challengeStatus);
-      setAdminMessage('Wellness Challenge campaign closed.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to end campaign.');
-    }
-  };
-
-  const handleStartHikingSeason = async () => {
-    try {
-      const response = await fetchJson('/api/admin/hiking-status/start', {
-        method: 'POST',
-        body: JSON.stringify({ title: 'Active Hiking Season Campaign' })
-      });
-      setHikingStatus(response.status || hikingStatus);
-      setAdminMessage('New Hiking Season started.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to start hiking season.');
-    }
-  };
-
-  const handleEndHikingSeason = async () => {
-    try {
-      const response = await fetchJson('/api/admin/hiking-status/end', { method: 'POST' });
-      setHikingStatus(response.status || hikingStatus);
-      setAdminMessage('Hiking Season closed.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to end hiking season.');
-    }
-  };
-
-  const handleStartRunningSeason = async () => {
-    try {
-      const response = await fetchJson('/api/admin/running-status/start', {
-        method: 'POST',
-        body: JSON.stringify({ title: 'Active Running Season Campaign' })
-      });
-      setRunningStatus(response.status || runningStatus);
-      setAdminMessage('New Running Season started.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to start running season.');
-    }
-  };
-
-  const handleEndRunningSeason = async () => {
-    try {
-      const response = await fetchJson('/api/admin/running-status/end', { method: 'POST' });
-      setRunningStatus(response.status || runningStatus);
-      setAdminMessage('Running Season closed.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to end running season.');
-    }
-  };
-
   const getStampBadge = (title) => {
     const normalized = String(title || '').toLowerCase();
     if (normalized.includes('hiking') || normalized.includes('summit')) {
@@ -776,6 +705,36 @@ export default function App() {
       return { Icon: Dumbbell, background: 'rgba(11, 65, 205, 0.12)', color: '#0b41cd' };
     }
     return { Icon: Users, background: 'rgba(11, 65, 205, 0.08)', color: '#0b41cd' };
+  };
+
+  const renderStampHistory = (stampList) => {
+    if (!stampList || stampList.length === 0) {
+      return <div className="empty-state">No stamps recorded for this club yet.</div>;
+    }
+
+    return (
+      <div className="stamp-list">
+        {stampList.map((stamp) => {
+          const { Icon, background, color } = getStampBadge(stamp.title);
+          return (
+            <div key={stamp.id} className="stamp-item">
+              <div className="stamp-badge" style={{ background, color }}>
+                <Icon className="stamp-badge-icon" />
+              </div>
+              <div className="stamp-copy">
+                <div className="stamp-title-row">
+                  <span className="stamp-title">{stamp.title}</span>
+                  <span className="stamp-points">+{stamp.points} pt</span>
+                </div>
+                <span className="stamp-time">
+                  {new Date(stamp.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const renderActivityCard = (category, isCampaignActive, isSpecial = false) => {
@@ -1199,28 +1158,8 @@ export default function App() {
                 </section>
 
                 <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-                  <div className="section-heading"><h3>Stamp History</h3></div>
-                  {!(currentUser?.stamps?.length) ? (
-                    <div className="empty-state">No stamps yet. Scan code or upload photo proof to log your activity.</div>
-                  ) : (
-                    <div className="stamp-list">
-                      {currentUser.stamps.map((stamp) => {
-                        const { Icon, background, color } = getStampBadge(stamp.title);
-                        return (
-                          <div key={stamp.id} className="stamp-item">
-                            <div className="stamp-badge" style={{ background, color }}><Icon className="stamp-badge-icon" /></div>
-                            <div className="stamp-copy">
-                              <div className="stamp-title-row">
-                                <span className="stamp-title">{stamp.title}</span>
-                                <span className="stamp-points">+{stamp.points} pt</span>
-                              </div>
-                              <span className="stamp-time">{new Date(stamp.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="section-heading"><h3>Wellness Challenge Stamp History</h3></div>
+                  {renderStampHistory(wellnessStamps)}
                 </section>
               </>
             )}
@@ -1248,6 +1187,11 @@ export default function App() {
                     </main>
                   </section>
                 )}
+
+                <section className="stamp-panel" style={{ marginTop: '2rem' }}>
+                  <div className="section-heading"><h3>Hiking Club Stamp History</h3></div>
+                  {renderStampHistory(hikingStamps)}
+                </section>
               </>
             )}
 
@@ -1274,6 +1218,11 @@ export default function App() {
                     </main>
                   </section>
                 )}
+
+                <section className="stamp-panel" style={{ marginTop: '2rem' }}>
+                  <div className="section-heading"><h3>Running Club Stamp History</h3></div>
+                  {renderStampHistory(runningStamps)}
+                </section>
               </>
             )}
 
