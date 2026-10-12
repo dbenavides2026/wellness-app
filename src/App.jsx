@@ -61,7 +61,7 @@ const hikingCategories = [
     points: 3,
     iconType: 'mountain',
     scanCode: 'HIKING-CLUB-101',
-    proofPrompt: 'Upload a photo from your trail or summit check-in.'
+    proofPrompt: 'Upload a photo from your trail check-in.'
   }
 ];
 
@@ -264,6 +264,7 @@ export default function App() {
     }
   }, [currentUser, adminUser, screen]);
 
+  // VALIDACIÓN ESTRICTA DE CÓDIGO QR EN ENVÍO
   const addStampWithCode = async (activity, directCode = '') => {
     if (!currentUser) return;
     const codeToSend = (directCode || scanEntries[activity.id] || '').trim().toUpperCase();
@@ -274,6 +275,7 @@ export default function App() {
       return;
     }
 
+    // Comprobación de coincidencia exacta
     if (expectedCode && codeToSend !== expectedCode) {
       setFormError(`Invalid QR code. Scanned "${codeToSend}", but "${activity.title}" requires "${expectedCode}".`);
       return;
@@ -307,6 +309,7 @@ export default function App() {
     addStampWithCode(activity, scanEntries[activity.id]);
   };
 
+  // CÁMARA DE ESCÁNER CON VERIFICACIÓN DE MATCH
   useEffect(() => {
     if (!scannerCategoryId) return undefined;
     let animId = 0, cancelled = false;
@@ -342,8 +345,9 @@ export default function App() {
 
           const expected = (targetCategory?.scanCode || '').trim().toUpperCase();
 
+          // Si el código no coincide, muestra error y mantiene el escáner abierto
           if (expected && val !== expected) {
-            setScannerError(`Invalid QR Code! Scanned code does not match "${targetCategory?.title}".`);
+            setScannerError(`Invalid QR code! Scanned "${val}", but requires "${expected}".`);
             if (!cancelled) animId = window.requestAnimationFrame(scanFrame);
             return;
           }
@@ -1172,16 +1176,19 @@ export default function App() {
           <nav className="portal-nav">
             <div className="portal-brand"><IdCard className="button-icon" /></div>
             <div className="portal-tabs">
-              <button type="button" className={`portal-nav-button ${activePortalTab === 'passport' ? 'active' : ''}`} onClick={() => setActivePortalTab('passport')}>Digital Passport</button>
-              <button type="button" className={`portal-nav-button ${activePortalTab === 'community' ? 'active' : ''}`} onClick={() => setActivePortalTab('community')}>Wellness Community</button>
-              <button type="button" className={`portal-nav-button ${activePortalTab === 'challenge' ? 'active' : ''}`} onClick={() => setActivePortalTab('challenge')}>Special Activities</button>
+              <button type="button" className={`portal-nav-button ${activePortalTab === 'passport' ? 'active' : ''}`} onClick={() => setActivePortalTab('passport')}>Wellness Challenge</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'hiking' ? 'active' : ''}`} onClick={() => setActivePortalTab('hiking')}>Hiking Club</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'running' ? 'active' : ''}`} onClick={() => setActivePortalTab('running')}>Running Club</button>
+              <button type="button" className={`portal-nav-button ${activePortalTab === 'community' ? 'active' : ''}`} onClick={() => setActivePortalTab('community')}>Wellness Community</button>
             </div>
           </nav>
 
           <div className="portal-content">
-            {/* DIGITAL PASSPORT TAB */}
+            {formError && (
+              <div className="auth-message error" style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '8px' }}>{formError}</div>
+            )}
+
+            {/* WELLNESS CHALLENGE TAB */}
             {activePortalTab === 'passport' && (
               <>
                 <header className="passport-header">
@@ -1237,7 +1244,7 @@ export default function App() {
 
                         {method === 'scan' ? (
                           <div className="scan-box">
-                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                            <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}>
                               <ScanLine className="button-icon" /> Scan code with camera
                             </button>
                           </div>
@@ -1262,7 +1269,80 @@ export default function App() {
                   })}
                 </main>
 
-                <section className="stamp-panel">
+                {/* SPECIAL ACTIVITIES CONSOLIDADO DEBAJO DE SPORTS & OUTDOOR GAME */}
+                <section className="challenge-panel" style={{ marginTop: '2rem' }}>
+                  <div className="section-heading">
+                    <h3>Special Activities</h3>
+                  </div>
+
+                  {!selectedChallenge ? (
+                    <div className="challenge-grid">
+                      {specialChallenges.length === 0 ? (
+                        <div className="empty-state">No special activities available at the moment.</div>
+                      ) : (
+                        specialChallenges.map((challenge) => (
+                          <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
+                            <span className="challenge-tag">Special</span>
+                            <h3>{challenge.title}</h3>
+                            <p>{challenge.description}</p>
+                            <strong>Reward: {challenge.points} pts</strong>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="challenge-detail">
+                      <div className="section-heading challenge-detail-header">
+                        <h3>{selectedChallenge.title}</h3>
+                        <button type="button" className="secondary-button small-action" onClick={() => setSelectedChallenge(null)}>
+                          Back to activities
+                        </button>
+                      </div>
+
+                      <div className="challenge-detail-card">
+                        <p>{selectedChallenge.description}</p>
+                        <div className="scan-box challenge-scan-box">
+                          <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(selectedChallenge.id); }}>
+                            <ScanLine className="button-icon" /> Scan activity QR
+                          </button>
+                          <div className="scan-meta">Reward: +{selectedChallenge.points} pts</div>
+                        </div>
+
+                        <label className="upload-box challenge-upload-box">
+                          <span className="upload-label">Photo proof</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setProofs((prev) => ({ ...prev, [selectedChallenge.id]: URL.createObjectURL(file) }));
+                              }
+                            }}
+                          />
+                          <span className="upload-hint">{selectedChallenge.proofPrompt || 'Upload a photo proof'}</span>
+                        </label>
+
+                        {proofs[selectedChallenge.id] ? (
+                          <div className="proof-preview-wrap">
+                            <img src={proofs[selectedChallenge.id]} alt="Proof preview" className="proof-preview" />
+                          </div>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          className="log-button"
+                          onClick={() => addStamp(selectedChallenge)}
+                          disabled={!challengeStatus.isActive}
+                        >
+                          <PlusCircle className="button-icon" /> Log in Activity
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="stamp-panel" style={{ marginTop: '2rem' }}>
                   <div className="section-heading"><h3>Stamp History</h3></div>
                   {!(currentUser?.stamps?.length) ? (
                     <div className="empty-state">No stamps yet. Scan code or upload photo proof to log your activity.</div>
@@ -1287,132 +1367,6 @@ export default function App() {
                   )}
                 </section>
               </>
-            )}
-
-            {/* WELLNESS COMMUNITY TAB */}
-            {activePortalTab === 'community' && (
-              <section className="community-panel">
-                <div className="section-heading">
-                  <h3>Wellness Community</h3>
-                </div>
-
-                <div className="community-composer">
-                  <textarea
-                    value={communityDraft.message}
-                    onChange={(event) => setCommunityDraft((prev) => ({ ...prev, message: event.target.value }))}
-                    placeholder="Share a progress update, encourage peers, or post a workout moment..."
-                  />
-                  <div className="community-actions">
-                    <label className="upload-button">
-                      <Upload className="button-icon" /> Add photo
-                      <input type="file" accept="image/*" onChange={(event) => handleCommunityImageUpload(event.target.files?.[0])} />
-                    </label>
-                    <button type="button" className="primary-button small-action" onClick={handleCommunityPostSubmit}>
-                      Post update
-                    </button>
-                  </div>
-                  {communityDraft.image ? (
-                    <div className="community-preview-wrap">
-                      <img src={communityDraft.image} alt="Upload preview" className="community-preview" />
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="community-feed">
-                  {communityPosts.length === 0 ? (
-                    <div className="empty-state">No community posts yet. Be the first to share an update!</div>
-                  ) : (
-                    communityPosts.map((post) => (
-                      <article key={post.id} className="community-post">
-                        <div className="community-post-header">
-                          <div>
-                            <strong>{post.author}</strong>
-                            <small>{post.role === 'admin' ? 'Admin' : 'Participant'}</small>
-                          </div>
-                          <span>{post.createdAt}</span>
-                        </div>
-                        {post.message ? <p>{post.message}</p> : null}
-                        {post.image ? <img src={post.image} alt="Post content" className="community-post-image" /> : null}
-                      </article>
-                    ))
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* SPECIAL ACTIVITIES TAB */}
-            {activePortalTab === 'challenge' && (
-              <section className="challenge-panel">
-                <div className="section-heading">
-                  <h3>Special Activities</h3>
-                </div>
-
-                {!selectedChallenge ? (
-                  <div className="challenge-grid">
-                    {specialChallenges.length === 0 ? (
-                      <div className="empty-state">No special activities available at the moment.</div>
-                    ) : (
-                      specialChallenges.map((challenge) => (
-                        <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
-                          <span className="challenge-tag">Special</span>
-                          <h3>{challenge.title}</h3>
-                          <p>{challenge.description}</p>
-                          <strong>Reward: {challenge.points} pts</strong>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                ) : (
-                  <div className="challenge-detail">
-                    <div className="section-heading challenge-detail-header">
-                      <h3>{selectedChallenge.title}</h3>
-                      <button type="button" className="secondary-button small-action" onClick={() => setSelectedChallenge(null)}>
-                        Back to activities
-                      </button>
-                    </div>
-
-                    <div className="challenge-detail-card">
-                      <p>{selectedChallenge.description}</p>
-                      <div className="scan-box challenge-scan-box">
-                        <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(selectedChallenge.id)}>
-                          <ScanLine className="button-icon" /> Scan activity QR
-                        </button>
-                        <div className="scan-meta">Reward: +{selectedChallenge.points} pts</div>
-                      </div>
-
-                      <label className="upload-box challenge-upload-box">
-                        <span className="upload-label">Photo proof</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setProofs((prev) => ({ ...prev, [selectedChallenge.id]: URL.createObjectURL(file) }));
-                            }
-                          }}
-                        />
-                        <span className="upload-hint">{selectedChallenge.proofPrompt || 'Upload a photo proof'}</span>
-                      </label>
-
-                      {proofs[selectedChallenge.id] ? (
-                        <div className="proof-preview-wrap">
-                          <img src={proofs[selectedChallenge.id]} alt="Proof preview" className="proof-preview" />
-                        </div>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        className="log-button"
-                        onClick={() => addStamp(selectedChallenge)}
-                        disabled={!challengeStatus.isActive}
-                      >
-                        <PlusCircle className="button-icon" /> Log in Activity
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
             )}
 
             {/* HIKING CLUB TAB */}
@@ -1458,7 +1412,7 @@ export default function App() {
 
                         {method === 'scan' ? (
                           <div className="scan-box">
-                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                            <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}>
                               <ScanLine className="button-icon" /> Scan hiking QR with camera
                             </button>
                           </div>
@@ -1547,7 +1501,7 @@ export default function App() {
 
                         {method === 'scan' ? (
                           <div className="scan-box">
-                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                            <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}>
                               <ScanLine className="button-icon" /> Scan running QR with camera
                             </button>
                           </div>
@@ -1593,6 +1547,57 @@ export default function App() {
               </section>
             )}
 
+            {/* WELLNESS COMMUNITY TAB */}
+            {activePortalTab === 'community' && (
+              <section className="community-panel">
+                <div className="section-heading">
+                  <h3>Wellness Community</h3>
+                </div>
+
+                <div className="community-composer">
+                  <textarea
+                    value={communityDraft.message}
+                    onChange={(event) => setCommunityDraft((prev) => ({ ...prev, message: event.target.value }))}
+                    placeholder="Share a progress update, encourage peers, or post a workout moment..."
+                  />
+                  <div className="community-actions">
+                    <label className="upload-button">
+                      <Upload className="button-icon" /> Add photo
+                      <input type="file" accept="image/*" onChange={(event) => handleCommunityImageUpload(event.target.files?.[0])} />
+                    </label>
+                    <button type="button" className="primary-button small-action" onClick={handleCommunityPostSubmit}>
+                      Post update
+                    </button>
+                  </div>
+                  {communityDraft.image ? (
+                    <div className="community-preview-wrap">
+                      <img src={communityDraft.image} alt="Upload preview" className="community-preview" />
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="community-feed">
+                  {communityPosts.length === 0 ? (
+                    <div className="empty-state">No community posts yet. Be the first to share an update!</div>
+                  ) : (
+                    communityPosts.map((post) => (
+                      <article key={post.id} className="community-post">
+                        <div className="community-post-header">
+                          <div>
+                            <strong>{post.author}</strong>
+                            <small>{post.role === 'admin' ? 'Admin' : 'Participant'}</small>
+                          </div>
+                          <span>{post.createdAt}</span>
+                        </div>
+                        {post.message ? <p>{post.message}</p> : null}
+                        {post.image ? <img src={post.image} alt="Post content" className="community-post-image" /> : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+
           </div>
         </div>
       </div>
@@ -1603,6 +1608,7 @@ export default function App() {
             <button type="button" className="close-scanner" onClick={() => setScannerCategoryId(null)}>Close</button>
             <video ref={videoRef} className="scanner-video" autoPlay playsInline muted />
             <canvas ref={canvasRef} hidden />
+            {scannerError && <p className="auth-message error" style={{ marginTop: '0.5rem' }}>{scannerError}</p>}
           </div>
         </div>
       )}
