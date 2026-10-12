@@ -131,26 +131,77 @@ const sanitizeUser = (user) => {
 const categoryQrConfigurations = [
   { id: 'gym', categoryId: 'gym', title: 'Gym / Solo Workout', points: 1, code: 'WELLNESS-GYM-101', scanCode: 'WELLNESS-GYM-101', isCategory: true },
   { id: 'group', categoryId: 'group', title: 'Group Fitness Class', points: 2, code: 'WELLNESS-GROUP-202', scanCode: 'WELLNESS-GROUP-202', isCategory: true },
-  { id: 'sports', categoryId: 'sports', title: 'Sports & Outdoor Game', points: 2, code: 'WELLNESS-SPORTS-303', scanCode: 'WELLNESS-SPORTS-303', isCategory: true }
+  { id: 'sports', categoryId: 'sports', title: 'Sports & Outdoor Game', points: 2, code: 'WELLNESS-SPORTS-303', scanCode: 'WELLNESS-SPORTS-303', isCategory: true },
+  { id: 'hiking-club-checkin', categoryId: 'hiking-club-checkin', title: 'Hiking Club Expedition', points: 3, code: 'HIKING-CLUB-101', scanCode: 'HIKING-CLUB-101', isCategory: true },
+  { id: 'running-club-checkin', categoryId: 'running-club-checkin', title: 'Running Club Session', points: 3, code: 'RUNNING-CLUB-101', scanCode: 'RUNNING-CLUB-101', isCategory: true }
 ];
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
-const buildQrCatalog = async () => {
+const generateSingleQr = async (text, darkColor = '#0f172a') => {
   try {
-    const specialChallenges = readSpecialChallenges();
-    const hikingChallenges = readHikingChallenges();
-    const runningChallenges = readRunningChallenges();
-
-    const challengeItems = await Promise.all(specialChallenges.map(async (ch) => ({ id: ch.id, title: ch.title, points: Number(ch.points || 10), code: ch.scanCode, scanCode: ch.scanCode, isCategory: false, qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#0f172a', light: '#ffffff' } }) })));
-    const hikingItems = await Promise.all(hikingChallenges.map(async (ch) => ({ id: ch.id, title: `[Hiking] ${ch.title}`, points: Number(ch.points || 15), code: ch.scanCode, scanCode: ch.scanCode, isCategory: false, qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#15803d', light: '#ffffff' } }) })));
-    const runningItems = await Promise.all(runningChallenges.map(async (ch) => ({ id: ch.id, title: `[Running] ${ch.title}`, points: Number(ch.points || 12), code: ch.scanCode, scanCode: ch.scanCode, isCategory: false, qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#b45309', light: '#ffffff' } }) })));
-    const categoryItems = await Promise.all(categoryQrConfigurations.map(async (cat) => ({ ...cat, qrCode: await QRCode.toDataURL(cat.code, { margin: 1, width: 420, color: { dark: '#0f172a', light: '#ffffff' } }) })));
-
-    return [...categoryItems, ...challengeItems, ...hikingItems, ...runningItems];
+    const codeString = String(text || '').trim();
+    if (!codeString) return '';
+    return await QRCode.toDataURL(codeString, {
+      margin: 1,
+      width: 420,
+      color: { dark: darkColor, light: '#ffffff' }
+    });
   } catch (err) {
-    return [];
+    console.error(`Failed to generate QR for: ${text}`, err);
+    return '';
   }
+};
+
+const buildQrCatalog = async () => {
+  const specialChallenges = readSpecialChallenges();
+  const hikingChallenges = readHikingChallenges();
+  const runningChallenges = readRunningChallenges();
+
+  const categoryItems = await Promise.all(
+    categoryQrConfigurations.map(async (cat) => ({
+      ...cat,
+      qrCode: await generateSingleQr(cat.scanCode, '#0f172a')
+    }))
+  );
+
+  const challengeItems = await Promise.all(
+    specialChallenges.map(async (ch) => ({
+      id: ch.id,
+      title: ch.title,
+      points: Number(ch.points || 10),
+      code: ch.scanCode,
+      scanCode: ch.scanCode,
+      isCategory: false,
+      qrCode: await generateSingleQr(ch.scanCode, '#0f172a')
+    }))
+  );
+
+  const hikingItems = await Promise.all(
+    hikingChallenges.map(async (ch) => ({
+      id: ch.id,
+      title: `[Hiking] ${ch.title}`,
+      points: Number(ch.points || 15),
+      code: ch.scanCode,
+      scanCode: ch.scanCode,
+      isCategory: false,
+      qrCode: await generateSingleQr(ch.scanCode, '#15803d')
+    }))
+  );
+
+  const runningItems = await Promise.all(
+    runningChallenges.map(async (ch) => ({
+      id: ch.id,
+      title: `[Running] ${ch.title}`,
+      points: Number(ch.points || 12),
+      code: ch.scanCode,
+      scanCode: ch.scanCode,
+      isCategory: false,
+      qrCode: await generateSingleQr(ch.scanCode, '#b45309')
+    }))
+  );
+
+  return [...categoryItems, ...challengeItems, ...hikingItems, ...runningItems];
 };
 
 const ensureSuperAdmin = async () => {
@@ -167,7 +218,6 @@ const ensureSuperAdmin = async () => {
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/participants', (_req, res) => res.json({ participants: readParticipants().map(sanitizeUser) }));
 
-// Actualización de Perfil (Nombre, Correo, Foto y Contraseña)
 app.put('/api/participants/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
