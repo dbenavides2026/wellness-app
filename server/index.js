@@ -16,6 +16,10 @@ const communityDbPath = path.join(dataDir, 'community.json');
 const specialChallengesDbPath = path.join(dataDir, 'special-challenges.json');
 const challengeStatusPath = path.join(dataDir, 'challenge-status.json');
 
+// Hiking Club Database Paths
+const hikingChallengesDbPath = path.join(dataDir, 'hiking-challenges.json');
+const hikingStatusPath = path.join(dataDir, 'hiking-status.json');
+
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
 if (!fs.existsSync(adminsDbPath)) fs.writeFileSync(adminsDbPath, JSON.stringify([], null, 2));
@@ -48,14 +52,6 @@ const defaultSpecialChallenges = [
     points: 10,
     scanCode: 'WELLNESS-CHALLENGE-TEAM',
     proofPrompt: 'Upload a photo of your team workout, class, or group challenge moment.'
-  },
-  {
-    id: crypto.randomUUID(),
-    title: 'Outdoor Move',
-    description: 'Take part in an outdoor or sport challenge and submit proof of your activity.',
-    points: 10,
-    scanCode: 'WELLNESS-CHALLENGE-OUTDOOR',
-    proofPrompt: 'Upload a photo of your outdoor session, sport, or active challenge.'
   }
 ];
 
@@ -65,7 +61,7 @@ if (!fs.existsSync(specialChallengesDbPath)) {
 
 const defaultChallengeStatus = {
   isActive: true,
-  title: 'Fresh challenge campaign started',
+  title: 'Active Wellness Challenge Campaign',
   startedAt: new Date().toISOString(),
   endedAt: ''
 };
@@ -74,11 +70,44 @@ if (!fs.existsSync(challengeStatusPath)) {
   fs.writeFileSync(challengeStatusPath, JSON.stringify(defaultChallengeStatus, null, 2));
 }
 
+const defaultHikingChallenges = [
+  {
+    id: crypto.randomUUID(),
+    title: 'Summit Peak Hike',
+    description: 'Reach the summit peak and log your check-in code.',
+    points: 15,
+    scanCode: 'HIKING-SUMMIT-101',
+    proofPrompt: 'Upload a photo at the peak summit.'
+  }
+];
+
+if (!fs.existsSync(hikingChallengesDbPath)) {
+  fs.writeFileSync(hikingChallengesDbPath, JSON.stringify(defaultHikingChallenges, null, 2));
+}
+
+const defaultHikingStatus = {
+  isActive: true,
+  title: 'Active Hiking Season Campaign',
+  startedAt: new Date().toISOString(),
+  endedAt: ''
+};
+
+if (!fs.existsSync(hikingStatusPath)) {
+  fs.writeFileSync(hikingStatusPath, JSON.stringify(defaultHikingStatus, null, 2));
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 const readJson = (filePath, fallback = []) => {
   try {
@@ -104,6 +133,11 @@ const writeSpecialChallenges = (challenges) => writeJson(specialChallengesDbPath
 const readChallengeStatus = () => readJson(challengeStatusPath, defaultChallengeStatus);
 const writeChallengeStatus = (status) => writeJson(challengeStatusPath, status);
 
+const readHikingChallenges = () => readJson(hikingChallengesDbPath, defaultHikingChallenges);
+const writeHikingChallenges = (challenges) => writeJson(hikingChallengesDbPath, challenges);
+const readHikingStatus = () => readJson(hikingStatusPath, defaultHikingStatus);
+const writeHikingStatus = (status) => writeJson(hikingStatusPath, status);
+
 const SUPERADMIN_EMAIL = 'superadmin@wellness.com';
 const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
 
@@ -124,6 +158,8 @@ const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const buildQrCatalog = async () => {
   try {
     const specialChallenges = readSpecialChallenges();
+    const hikingChallenges = readHikingChallenges();
+
     const challengeItems = await Promise.all(
       specialChallenges.map(async (ch) => ({
         id: ch.id,
@@ -136,6 +172,18 @@ const buildQrCatalog = async () => {
       }))
     );
 
+    const hikingItems = await Promise.all(
+      hikingChallenges.map(async (ch) => ({
+        id: ch.id,
+        title: `[Hiking] ${ch.title}`,
+        points: Number(ch.points || 15),
+        code: ch.scanCode,
+        scanCode: ch.scanCode,
+        isCategory: false,
+        qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#15803d', light: '#ffffff' } })
+      }))
+    );
+
     const categoryItems = await Promise.all(
       categoryQrConfigurations.map(async (cat) => ({
         ...cat,
@@ -143,7 +191,7 @@ const buildQrCatalog = async () => {
       }))
     );
 
-    return [...categoryItems, ...challengeItems];
+    return [...categoryItems, ...challengeItems, ...hikingItems];
   } catch (err) {
     console.error('QR Catalog Error:', err);
     return [];
@@ -195,7 +243,7 @@ app.post('/api/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = { id: crypto.randomUUID(), fullName, email, password: passwordHash, passwordPlain: password, stamps: [] };
+    const user = { id: crypto.randomUUID(), fullName, email, password: passwordHash, passwordPlain: password, stamps: [], role: 'participant', createdAt: new Date().toISOString() };
     participants.push(user);
     writeParticipants(participants);
 
@@ -285,12 +333,68 @@ app.get('/api/admin/stats', (_req, res) => {
   }
 });
 
+// User Management (Admin Portal)
+app.put('/api/admin/participants/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, email, role } = req.body;
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === id);
+
+    if (idx === -1) return res.status(404).json({ message: 'User not found.' });
+
+    if (fullName) participants[idx].fullName = String(fullName).trim();
+    if (email) participants[idx].email = normalizeEmail(email);
+    if (role) participants[idx].role = role;
+
+    writeParticipants(participants);
+    return res.json({ user: sanitizeUser(participants[idx]), message: 'User updated successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/api/admin/participants/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    let participants = readParticipants();
+    const exists = participants.some((p) => p.id === id);
+
+    if (!exists) return res.status(404).json({ message: 'User not found.' });
+
+    participants = participants.filter((p) => p.id !== id);
+    writeParticipants(participants);
+
+    return res.json({ message: 'User deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/admin/participants/:id/promote', (req, res) => {
+  try {
+    const { id } = req.params;
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === id);
+
+    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
+
+    participants[idx].role = 'admin';
+    writeParticipants(participants);
+
+    return res.json({ user: sanitizeUser(participants[idx]), message: `${participants[idx].fullName} assigned as admin.` });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// Wellness Challenge Campaigns (Sin borrar base de datos de usuarios)
 app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
 
 app.post('/api/admin/challenge-status/start', (req, res) => {
   try {
-    const status = { isActive: true, title: String(req.body.title || 'Fresh challenge campaign started').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+    const status = { isActive: true, title: String(req.body.title || 'Active Wellness Challenge Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
     writeChallengeStatus(status);
     return res.status(201).json({ status });
   } catch (err) {
@@ -300,9 +404,11 @@ app.post('/api/admin/challenge-status/start', (req, res) => {
 
 app.post('/api/admin/challenge-status/end', (_req, res) => {
   try {
-    writeParticipants([]);
-    writeSpecialChallenges([]);
-    const status = { isActive: false, title: 'Campaign ended', startedAt: '', endedAt: new Date().toISOString() };
+    // Resetear sellos y estadísticas sin borrar la base de datos de usuarios
+    const participants = readParticipants().map((p) => ({ ...p, stamps: [] }));
+    writeParticipants(participants);
+
+    const status = { isActive: false, title: 'Wellness Campaign Ended', startedAt: '', endedAt: new Date().toISOString() };
     writeChallengeStatus(status);
     return res.json({ status });
   } catch (err) {
@@ -310,7 +416,6 @@ app.post('/api/admin/challenge-status/end', (_req, res) => {
   }
 });
 
-// Crear Actividades Especiales y Generar sus Códigos QR
 app.post('/api/admin/challenges', (req, res) => {
   try {
     const title = String(req.body.title || req.body.name || '').trim();
@@ -352,7 +457,72 @@ app.delete('/api/admin/challenges/:id', (req, res) => {
   }
 });
 
-// Comunidad Persistente
+// Manage Hiking Club Endpoints
+app.get('/api/hiking-challenges', (_req, res) => res.json({ challenges: readHikingChallenges() }));
+app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
+
+app.post('/api/admin/hiking-status/start', (req, res) => {
+  try {
+    const status = { isActive: true, title: String(req.body.title || 'Active Hiking Club Season').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+    writeHikingStatus(status);
+    return res.status(201).json({ status });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/admin/hiking-status/end', (_req, res) => {
+  try {
+    const status = { isActive: false, title: 'Hiking Season Ended', startedAt: '', endedAt: new Date().toISOString() };
+    writeHikingStatus(status);
+    return res.json({ status });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/admin/hiking-challenges', (req, res) => {
+  try {
+    const title = String(req.body.title || '').trim();
+    const description = String(req.body.description || '').trim();
+    const points = Number(req.body.points || 15);
+    const scanCode = String(req.body.scanCode || `HIKING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
+    const proofPrompt = String(req.body.proofPrompt || 'Upload a photo from the hike.').trim();
+
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Hiking title and description are required.' });
+    }
+
+    const challenges = readHikingChallenges();
+    const challenge = {
+      id: crypto.randomUUID(),
+      title,
+      description,
+      points: Number.isFinite(points) && points > 0 ? points : 15,
+      scanCode,
+      proofPrompt
+    };
+
+    challenges.unshift(challenge);
+    writeHikingChallenges(challenges);
+
+    return res.status(201).json({ challenge, challenges });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
+  try {
+    const challenges = readHikingChallenges().filter((c) => c.id !== req.params.id);
+    writeHikingChallenges(challenges);
+    return res.json({ deleted: true, count: challenges.length, challenges });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// Comunidad
 app.get('/api/admin/community', (_req, res) => {
   return res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) });
 });
@@ -389,25 +559,34 @@ app.post('/api/admin/community', (req, res) => {
   }
 });
 
+// Log Stamp / Activity Check-In (Validación de Campaña Activa)
 app.post('/api/participants/:id/stamps', (req, res) => {
   try {
     const { id } = req.params;
     const { title, points, method, categoryId, scanCode } = req.body;
-    const status = readChallengeStatus();
 
-    if (!status || !status.isActive) {
-      return res.status(403).json({ message: 'Activity logging is disabled because no campaign is active.' });
+    const wellnessStatus = readChallengeStatus();
+    const hikingStatus = readHikingStatus();
+
+    const cleanCode = String(scanCode || '').trim().toUpperCase();
+    const isHikingCode = cleanCode.startsWith('HIKING-');
+
+    if (isHikingCode && (!hikingStatus || !hikingStatus.isActive)) {
+      return res.status(403).json({ message: 'Hiking activity logging is disabled because no active Hiking campaign is running.' });
+    }
+
+    if (!isHikingCode && (!wellnessStatus || !wellnessStatus.isActive)) {
+      return res.status(403).json({ message: 'Wellness activity logging is disabled because no active Wellness campaign is running.' });
     }
 
     const participants = readParticipants();
     const idx = participants.findIndex((p) => p.id === id);
     if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
 
-    const cleanCode = String(scanCode || '').trim().toUpperCase();
     let finalTitle = title;
     let finalPoints = Number(points || 1);
 
-    const catalog = [...categoryQrConfigurations, ...readSpecialChallenges()];
+    const catalog = [...categoryQrConfigurations, ...readSpecialChallenges(), ...readHikingChallenges()];
     const match = catalog.find((item) => item.code === cleanCode || item.scanCode === cleanCode);
     if (match) {
       finalTitle = match.title;
