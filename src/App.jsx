@@ -20,6 +20,7 @@ import {
   Upload,
   UserPlus,
   Users,
+  Mountain
 } from 'lucide-react';
 import './App.css';
 
@@ -117,10 +118,26 @@ export default function App() {
     endedAt: ''
   });
 
+  const [hikingChallenges, setHikingChallenges] = useState([]);
+  const [hikingStatus, setHikingStatus] = useState({
+    isActive: false,
+    title: 'No active hiking season',
+    startedAt: '',
+    endedAt: ''
+  });
+
   const [challengeForm, setChallengeForm] = useState({
     title: '',
     description: '',
     points: 10,
+    scanCode: '',
+    proofPrompt: ''
+  });
+
+  const [hikingForm, setHikingForm] = useState({
+    title: '',
+    description: '',
+    points: 15,
     scanCode: '',
     proofPrompt: ''
   });
@@ -142,11 +159,13 @@ export default function App() {
   const refreshAllData = async () => {
     try {
       const t = Date.now();
-      const [parts, comms, chs, status] = await Promise.all([
+      const [parts, comms, chs, status, hChs, hStatus] = await Promise.all([
         fetchJson(`/api/participants?t=${t}`),
         fetchJson(`/api/admin/community?t=${t}`),
         fetchJson(`/api/challenges?t=${t}`),
-        fetchJson(`/api/admin/challenge-status?t=${t}`)
+        fetchJson(`/api/admin/challenge-status?t=${t}`),
+        fetchJson(`/api/hiking-challenges?t=${t}`),
+        fetchJson(`/api/admin/hiking-status?t=${t}`)
       ]);
 
       const updatedParticipants = parts.participants || [];
@@ -155,6 +174,8 @@ export default function App() {
       setAdminCommunityPosts(comms.posts || []);
       setSpecialChallenges(chs.challenges || []);
       setChallengeStatus(status.status || { isActive: false, title: 'No active challenge' });
+      setHikingChallenges(hChs.challenges || []);
+      setHikingStatus(hStatus.status || { isActive: false, title: 'No active hiking season' });
 
       if (currentUser?.id) {
         const freshUser = updatedParticipants.find((p) => p.id === currentUser.id);
@@ -301,6 +322,7 @@ export default function App() {
 
           const targetCategory = categories.find((cat) => cat.id === scannerCategoryId)
             || specialChallenges.find((sc) => sc.id === scannerCategoryId)
+            || hikingChallenges.find((hc) => hc.id === scannerCategoryId)
             || { id: scannerCategoryId, title: 'QR Check-in', points: 1 };
 
           addStampWithCode(targetCategory, val);
@@ -385,22 +407,48 @@ export default function App() {
   };
 
   const promoteParticipantToAdmin = async (participant) => {
-    if (!adminUser || (adminUser.role !== 'superadmin' && adminUser.role !== 'admin')) {
-      setAdminMessage('Only admins can assign administrative access.');
-      return;
-    }
-
     try {
       const response = await fetchJson(`/api/admin/participants/${participant.id}/promote`, {
         method: 'POST',
         body: JSON.stringify({})
       });
-
-      setAdminMessage(response.message || `${participant.fullName} was promoted to admin.`);
+      setAdminMessage(response.message || `${participant.fullName} promoted to admin.`);
       await refreshAllData();
       await refreshAdminData();
     } catch (error) {
-      setAdminMessage(error.message || 'Unable to promote this participant to admin.');
+      setAdminMessage(error.message || 'Unable to promote user.');
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setEditingParticipantId(user.id);
+    setEditingParticipantDraft({ fullName: user.fullName, email: user.email, role: user.role || 'participant' });
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      await fetchJson(`/api/admin/participants/${editingParticipantId}`, {
+        method: 'PUT',
+        body: JSON.stringify(editingParticipantDraft)
+      });
+      setEditingParticipantId(null);
+      setAdminMessage('User updated successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to update user.');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    try {
+      await fetchJson(`/api/admin/participants/${userId}`, { method: 'DELETE' });
+      setAdminMessage('User deleted successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete user.');
     }
   };
 
@@ -484,10 +532,8 @@ export default function App() {
     }
 
     try {
-      const method = editingChallengeId ? 'PUT' : 'POST';
-      const url = editingChallengeId ? `/api/admin/challenges/${editingChallengeId}` : '/api/admin/challenges';
-      await fetchJson(url, {
-        method,
+      await fetchJson('/api/admin/challenges', {
+        method: 'POST',
         body: JSON.stringify({
           ...challengeForm,
           points: Number(challengeForm.points) || 10,
@@ -496,8 +542,7 @@ export default function App() {
       });
 
       setChallengeForm({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
-      setEditingChallengeId(null);
-      setAdminMessage('Special activity saved successfully.');
+      setAdminMessage('Wellness Special activity saved successfully.');
       await refreshAllData();
       await refreshAdminData();
     } catch (error) {
@@ -505,14 +550,41 @@ export default function App() {
     }
   };
 
+  const handleSaveHikingChallenge = async () => {
+    const title = hikingForm.title.trim();
+    const description = hikingForm.description.trim();
+    if (!title || !description) {
+      setAdminMessage('Hiking title and description are required.');
+      return;
+    }
+
+    try {
+      await fetchJson('/api/admin/hiking-challenges', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...hikingForm,
+          points: Number(hikingForm.points) || 15,
+          proofPrompt: hikingForm.proofPrompt.trim() || 'Upload a photo proof.'
+        })
+      });
+
+      setHikingForm({ title: '', description: '', points: 15, scanCode: '', proofPrompt: '' });
+      setAdminMessage('Hiking activity saved successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to save hiking activity.');
+    }
+  };
+
   const handleStartChallenge = async () => {
     try {
       const response = await fetchJson('/api/admin/challenge-status/start', {
         method: 'POST',
-        body: JSON.stringify({ title: 'Fresh challenge campaign started' })
+        body: JSON.stringify({ title: 'Active Wellness Challenge Campaign' })
       });
       setChallengeStatus(response.status || challengeStatus);
-      setAdminMessage('New challenge campaign started.');
+      setAdminMessage('New Wellness Challenge campaign started.');
       await refreshAllData();
     } catch (error) {
       setAdminMessage(error.message || 'Unable to start campaign.');
@@ -523,23 +595,48 @@ export default function App() {
     try {
       const response = await fetchJson('/api/admin/challenge-status/end', { method: 'POST' });
       setChallengeStatus(response.status || challengeStatus);
-      setAdminMessage('Current challenge campaign ended.');
+      setAdminMessage('Wellness Challenge campaign closed. Users retained, activity logs cleared.');
       await refreshAllData();
     } catch (error) {
       setAdminMessage(error.message || 'Unable to end campaign.');
     }
   };
 
+  const handleStartHikingSeason = async () => {
+    try {
+      const response = await fetchJson('/api/admin/hiking-status/start', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Active Hiking Season Campaign' })
+      });
+      setHikingStatus(response.status || hikingStatus);
+      setAdminMessage('New Hiking Season started.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to start hiking season.');
+    }
+  };
+
+  const handleEndHikingSeason = async () => {
+    try {
+      const response = await fetchJson('/api/admin/hiking-status/end', { method: 'POST' });
+      setHikingStatus(response.status || hikingStatus);
+      setAdminMessage('Hiking Season closed.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to end hiking season.');
+    }
+  };
+
   const getStampBadge = (title) => {
     const normalized = String(title || '').toLowerCase();
+    if (normalized.includes('hiking') || normalized.includes('summit')) {
+      return { Icon: Mountain, background: 'rgba(21, 128, 61, 0.12)', color: '#15803d' };
+    }
     if (normalized.includes('challenge') || normalized.includes('sprint') || normalized.includes('boost') || normalized.includes('outdoor') || normalized.includes('move')) {
       return { Icon: Sparkles, background: 'rgba(245, 158, 11, 0.12)', color: '#b45309' };
     }
     if (normalized.includes('gym') || normalized.includes('workout')) {
       return { Icon: Dumbbell, background: 'rgba(11, 65, 205, 0.12)', color: '#0b41cd' };
-    }
-    if (normalized.includes('sport') || normalized.includes('outdoor') || normalized.includes('game')) {
-      return { Icon: Trophy, background: 'rgba(11, 65, 205, 0.10)', color: '#0b41cd' };
     }
     return { Icon: Users, background: 'rgba(11, 65, 205, 0.08)', color: '#0b41cd' };
   };
@@ -618,7 +715,6 @@ export default function App() {
 
   if (screen === 'admin-dashboard') {
     const stats = adminStats?.stats || {};
-    const recentActivity = adminStats?.recentActivity || [];
     const categoryEntries = Object.entries(stats.categoryBreakdown || {});
     const topUsers = [...adminReport].sort((a, b) => Number(b.totalPoints) - Number(a.totalPoints)).slice(0, 10);
     const maxCategoryCount = categoryEntries.length > 0 ? Math.max(...categoryEntries.map(([, count]) => Number(count || 0))) : 1;
@@ -637,50 +733,18 @@ export default function App() {
 
           <nav className="admin-top-nav">
             <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Admin</button>
-            <button type="button" className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Active challenge</button>
+            <button type="button" className={adminTab === 'users' ? 'active' : ''} onClick={() => setAdminTab('users')}>User management</button>
+            <button type="button" className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Wellness Challenge</button>
+            <button type="button" className={adminTab === 'hiking' ? 'active' : ''} onClick={() => setAdminTab('hiking')}>Manage Hiking Club</button>
             <button type="button" className={adminTab === 'community' ? 'active' : ''} onClick={() => setAdminTab('community')}>Community management</button>
             <button type="button" className={adminTab === 'qr' ? 'active' : ''} onClick={() => setAdminTab('qr')}>Category QR codes</button>
           </nav>
 
           {adminMessage ? <p className="auth-message success" style={{ margin: '1rem 0' }}>{adminMessage}</p> : null}
 
-          {/* TAB ADMIN: ASIGNAR ROLES, MÉTRICAS Y GRÁFICOS */}
+          {/* OVERVIEW PRINCIPAL */}
           {adminTab === 'admin' && (
             <>
-              {/* PANEL DE ASIGNACIÓN DE ADMIN */}
-              <section className="admin-panel assignment-panel" style={{ marginBottom: '1.5rem' }}>
-                <div className="section-heading">
-                  <h3>Assign admin role</h3>
-                </div>
-                <div className="participant-list">
-                  {participants.length === 0 ? (
-                    <div className="empty-state">No registered participants yet.</div>
-                  ) : (
-                    participants.map((participant) => {
-                      const alreadyAdmin = participant.role === 'admin' || (adminUser?.email && participant.email === adminUser.email);
-                      return (
-                        <div key={participant.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #e2e8f0' }}>
-                          <div>
-                            <strong>{participant.fullName}</strong>
-                            <br />
-                            <small style={{ color: '#64748b' }}>{participant.email}</small>
-                          </div>
-                          <button
-                            type="button"
-                            className="small-button"
-                            disabled={alreadyAdmin}
-                            onClick={() => promoteParticipantToAdmin(participant)}
-                          >
-                            {alreadyAdmin ? 'Admin assigned' : 'Assign admin'}
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </section>
-
-              {/* METRICAS PRINCIPALES */}
               <section className="admin-metrics">
                 <article className="metric-card accent"><span>Total participants</span><strong>{stats.totalParticipants || 0}</strong></article>
                 <article className="metric-card"><span>Active participants</span><strong>{stats.activeParticipants || 0}</strong></article>
@@ -688,7 +752,6 @@ export default function App() {
                 <article className="metric-card"><span>Total points</span><strong>{stats.totalPoints || 0}</strong></article>
               </section>
 
-              {/* GRÁFICOS DE BARRAS */}
               <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', margin: '1.5rem 0' }}>
                 <div className="admin-panel chart-panel">
                   <h3>Category activity</h3>
@@ -719,10 +782,7 @@ export default function App() {
                         <div key={entry.id} className="bar-row">
                           <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{entry.fullName}</span>
                           <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
-                            <div
-                              className="bar-fill user-fill"
-                              style={{ width: `${Math.max((Number(entry.totalPoints || 0) / maxUserPoints) * 100, 8)}%`, background: '#f59e0b', height: '100%' }}
-                            />
+                            <div className="bar-fill user-fill" style={{ width: `${Math.max((Number(entry.totalPoints || 0) / maxUserPoints) * 100, 8)}%`, background: '#f59e0b', height: '100%' }} />
                           </div>
                           <strong>{entry.totalPoints} pts</strong>
                         </div>
@@ -732,29 +792,55 @@ export default function App() {
                 </div>
               </section>
 
-              {/* REPORTES Y CSV */}
+              {/* REPORT CON BOTONES DE ACCIÓN */}
               <section className="admin-panel report-panel">
                 <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3>Participant report</h3>
+                  <h3>Wellness Challenge participants</h3>
                   <button type="button" className="small-button" onClick={() => window.open('/api/admin/report/csv', '_blank')}>Export CSV</button>
                 </div>
                 <div className="report-table-wrap" style={{ overflowX: 'auto', marginTop: '1rem' }}>
                   <table className="report-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th></tr>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                       {adminReport.length === 0 ? (
-                        <tr><td colSpan="6" style={{ padding: '1rem', textAlign: 'center' }}>No participant activity yet.</td></tr>
+                        <tr><td colSpan="7" style={{ padding: '1rem', textAlign: 'center' }}>No participant activity yet.</td></tr>
                       ) : (
                         adminReport.map((entry) => (
                           <tr key={entry.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '0.5rem 0' }}>{entry.fullName}</td>
-                            <td>{entry.email}</td>
-                            <td>{entry.role}</td>
-                            <td>{entry.totalStamps}</td>
-                            <td>{entry.totalPoints}</td>
-                            <td>{entry.lastActivity}</td>
+                            {editingParticipantId === entry.id ? (
+                              <>
+                                <td><input type="text" value={editingParticipantDraft.fullName} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, fullName: e.target.value })} /></td>
+                                <td><input type="email" value={editingParticipantDraft.email} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, email: e.target.value })} /></td>
+                                <td>
+                                  <select value={editingParticipantDraft.role} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, role: e.target.value })}>
+                                    <option value="participant">Participant</option>
+                                    <option value="admin">Admin</option>
+                                  </select>
+                                </td>
+                                <td>{entry.totalStamps}</td>
+                                <td>{entry.totalPoints}</td>
+                                <td>{entry.lastActivity}</td>
+                                <td>
+                                  <button type="button" className="small-button" onClick={handleSaveUser}>Save</button>
+                                  <button type="button" className="secondary-button small-action" onClick={() => setEditingParticipantId(null)}>Cancel</button>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td style={{ padding: '0.5rem 0' }}>{entry.fullName}</td>
+                                <td>{entry.email}</td>
+                                <td>{entry.role}</td>
+                                <td>{entry.totalStamps}</td>
+                                <td>{entry.totalPoints}</td>
+                                <td>{entry.lastActivity}</td>
+                                <td style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button type="button" className="icon-button edit-button" onClick={() => handleEditUser(entry)} aria-label="Edit User"><Edit size={16} /></button>
+                                  <button type="button" className="icon-button delete-button" onClick={() => handleDeleteUser(entry.id)} aria-label="Delete User"><Trash2 size={16} /></button>
+                                </td>
+                              </>
+                            )}
                           </tr>
                         ))
                       )}
@@ -765,14 +851,45 @@ export default function App() {
             </>
           )}
 
-          {/* MANAGE CHALLENGES & SPECIAL ACTIVITIES */}
+          {/* SECCIÓN USER MANAGEMENT */}
+          {adminTab === 'users' && (
+            <section className="admin-panel assignment-panel">
+              <div className="section-heading">
+                <h3>Registered Account Management</h3>
+              </div>
+              <div className="participant-list" style={{ marginTop: '1rem' }}>
+                {participants.length === 0 ? (
+                  <div className="empty-state">No registered accounts found.</div>
+                ) : (
+                  participants.map((p) => (
+                    <div key={p.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                      <div>
+                        <strong>{p.fullName}</strong> <small>({p.role || 'participant'})</small>
+                        <br />
+                        <small style={{ color: '#64748b' }}>{p.email}</small>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {p.role !== 'admin' && (
+                          <button type="button" className="small-button" onClick={() => promoteParticipantToAdmin(p)}>Assign admin</button>
+                        )}
+                        <button type="button" className="icon-button edit-button" onClick={() => handleEditUser(p)}><Edit size={16} /></button>
+                        <button type="button" className="icon-button delete-button" onClick={() => handleDeleteUser(p.id)}><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* SECCIÓN MANAGE WELLNESS CHALLENGE */}
           {adminTab === 'challenge' && (
             <section className="admin-panel special-challenges-panel">
-              <div className="section-heading"><h3>Manage Active challenge</h3></div>
+              <div className="section-heading"><h3>Manage Wellness Challenge</h3></div>
               <div className="challenge-status-card">
                 <div className="challenge-status-copy">
-                  <span className={`challenge-status-pill ${challengeStatus.isActive ? 'live' : 'paused'}`}>{challengeStatus.isActive ? 'Active challenge' : 'No active challenge'}</span>
-                  <strong>{challengeStatus.title || 'No active challenge'}</strong>
+                  <span className={`challenge-status-pill ${challengeStatus.isActive ? 'live' : 'paused'}`}>{challengeStatus.isActive ? 'Active Campaign' : 'Campaign Ended'}</span>
+                  <strong>{challengeStatus.title || 'No active campaign'}</strong>
                 </div>
                 <div className="admin-challenge-actions">
                   <button type="button" className="secondary-button" onClick={handleEndChallenge}>End Current Challenge Campaign</button>
@@ -791,6 +908,44 @@ export default function App() {
                 <div className="special-challenges-list">
                   {specialChallenges.length === 0 ? <div className="empty-state">No special activities configured yet.</div> : (
                     specialChallenges.map((ch) => (
+                      <div key={ch.id} className="admin-community-item">
+                        <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
+                        <p>{ch.description}</p>
+                        <small className="challenge-code">{ch.scanCode}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* NUEVA SECCIÓN: MANAGE HIKING CLUB */}
+          {adminTab === 'hiking' && (
+            <section className="admin-panel special-challenges-panel">
+              <div className="section-heading"><h3>Manage Hiking Club</h3></div>
+              <div className="challenge-status-card">
+                <div className="challenge-status-copy">
+                  <span className={`challenge-status-pill ${hikingStatus.isActive ? 'live' : 'paused'}`}>{hikingStatus.isActive ? 'Active Hiking Season' : 'Hiking Season Closed'}</span>
+                  <strong>{hikingStatus.title || 'No active hiking season'}</strong>
+                </div>
+                <div className="admin-challenge-actions">
+                  <button type="button" className="secondary-button" onClick={handleEndHikingSeason}>End Hiking Campaign</button>
+                  <button type="button" className="primary-button" onClick={handleStartHikingSeason}>Start New Hiking Campaign</button>
+                </div>
+              </div>
+
+              <div className="section-heading special-activities-heading"><h3>Add Hiking Activity</h3></div>
+              <div className="special-challenges-layout">
+                <div className="special-challenges-form">
+                  <label><span className="input-label">Hike Title</span><input type="text" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} placeholder="Summit Peak Hike" /></label>
+                  <label><span className="input-label">Description</span><textarea value={hikingForm.description} onChange={(e) => setHikingForm({ ...hikingForm, description: e.target.value })} placeholder="Describe location and difficulty..." /></label>
+                  <label><span className="input-label">Points</span><input type="number" min="1" value={hikingForm.points} onChange={(e) => setHikingForm({ ...hikingForm, points: e.target.value })} /></label>
+                  <button type="button" className="primary-button" onClick={handleSaveHikingChallenge}>Add Hiking Activity</button>
+                </div>
+                <div className="special-challenges-list">
+                  {hikingChallenges.length === 0 ? <div className="empty-state">No hiking activities configured yet.</div> : (
+                    hikingChallenges.map((ch) => (
                       <div key={ch.id} className="admin-community-item">
                         <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
                         <p>{ch.description}</p>
@@ -1030,12 +1185,12 @@ export default function App() {
 
                 {!selectedChallenge ? (
                   <div className="challenge-grid">
-                    {specialChallenges.length === 0 ? (
+                    {[...specialChallenges, ...hikingChallenges].length === 0 ? (
                       <div className="empty-state">No special activities available at the moment.</div>
                     ) : (
-                      specialChallenges.map((challenge) => (
+                      [...specialChallenges, ...hikingChallenges].map((challenge) => (
                         <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
-                          <span className="challenge-tag">Special</span>
+                          <span className="challenge-tag">{challenge.scanCode?.startsWith('HIKING') ? 'Hiking Club' : 'Special'}</span>
                           <h3>{challenge.title}</h3>
                           <p>{challenge.description}</p>
                           <strong>Reward: {challenge.points} pts</strong>
@@ -1086,7 +1241,7 @@ export default function App() {
                         type="button"
                         className="log-button"
                         onClick={() => addStamp(selectedChallenge)}
-                        disabled={!challengeStatus.isActive}
+                        disabled={selectedChallenge.scanCode?.startsWith('HIKING') ? !hikingStatus.isActive : !challengeStatus.isActive}
                       >
                         <PlusCircle className="button-icon" /> Log in Activity
                       </button>
