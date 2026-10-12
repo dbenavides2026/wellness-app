@@ -20,6 +20,10 @@ const challengeStatusPath = path.join(dataDir, 'challenge-status.json');
 const hikingChallengesDbPath = path.join(dataDir, 'hiking-challenges.json');
 const hikingStatusPath = path.join(dataDir, 'hiking-status.json');
 
+// Running Club Database Paths
+const runningChallengesDbPath = path.join(dataDir, 'running-challenges.json');
+const runningStatusPath = path.join(dataDir, 'running-status.json');
+
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
 if (!fs.existsSync(adminsDbPath)) fs.writeFileSync(adminsDbPath, JSON.stringify([], null, 2));
@@ -96,6 +100,32 @@ if (!fs.existsSync(hikingStatusPath)) {
   fs.writeFileSync(hikingStatusPath, JSON.stringify(defaultHikingStatus, null, 2));
 }
 
+const defaultRunningChallenges = [
+  {
+    id: crypto.randomUUID(),
+    title: '5K Morning Run',
+    description: 'Complete a 5K morning run and scan your finish code.',
+    points: 12,
+    scanCode: 'RUNNING-5K-101',
+    proofPrompt: 'Upload a photo from your run or fitness tracker app.'
+  }
+];
+
+if (!fs.existsSync(runningChallengesDbPath)) {
+  fs.writeFileSync(runningChallengesDbPath, JSON.stringify(defaultRunningChallenges, null, 2));
+}
+
+const defaultRunningStatus = {
+  isActive: true,
+  title: 'Active Running Season Campaign',
+  startedAt: new Date().toISOString(),
+  endedAt: ''
+};
+
+if (!fs.existsSync(runningStatusPath)) {
+  fs.writeFileSync(runningStatusPath, JSON.stringify(defaultRunningStatus, null, 2));
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -138,6 +168,11 @@ const writeHikingChallenges = (challenges) => writeJson(hikingChallengesDbPath, 
 const readHikingStatus = () => readJson(hikingStatusPath, defaultHikingStatus);
 const writeHikingStatus = (status) => writeJson(hikingStatusPath, status);
 
+const readRunningChallenges = () => readJson(runningChallengesDbPath, defaultRunningChallenges);
+const writeRunningChallenges = (challenges) => writeJson(runningChallengesDbPath, challenges);
+const readRunningStatus = () => readJson(runningStatusPath, defaultRunningStatus);
+const writeRunningStatus = (status) => writeJson(runningStatusPath, status);
+
 const SUPERADMIN_EMAIL = 'superadmin@wellness.com';
 const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
 
@@ -159,6 +194,7 @@ const buildQrCatalog = async () => {
   try {
     const specialChallenges = readSpecialChallenges();
     const hikingChallenges = readHikingChallenges();
+    const runningChallenges = readRunningChallenges();
 
     const challengeItems = await Promise.all(
       specialChallenges.map(async (ch) => ({
@@ -184,6 +220,18 @@ const buildQrCatalog = async () => {
       }))
     );
 
+    const runningItems = await Promise.all(
+      runningChallenges.map(async (ch) => ({
+        id: ch.id,
+        title: `[Running] ${ch.title}`,
+        points: Number(ch.points || 12),
+        code: ch.scanCode,
+        scanCode: ch.scanCode,
+        isCategory: false,
+        qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#b45309', light: '#ffffff' } })
+      }))
+    );
+
     const categoryItems = await Promise.all(
       categoryQrConfigurations.map(async (cat) => ({
         ...cat,
@@ -191,7 +239,7 @@ const buildQrCatalog = async () => {
       }))
     );
 
-    return [...categoryItems, ...challengeItems, ...hikingItems];
+    return [...categoryItems, ...challengeItems, ...hikingItems, ...runningItems];
   } catch (err) {
     console.error('QR Catalog Error:', err);
     return [];
@@ -388,7 +436,7 @@ app.post('/api/admin/participants/:id/promote', (req, res) => {
   }
 });
 
-// Wellness Challenge Campaigns (Sin borrar base de datos de usuarios)
+// Wellness Challenge Endpoints
 app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
 
@@ -404,7 +452,6 @@ app.post('/api/admin/challenge-status/start', (req, res) => {
 
 app.post('/api/admin/challenge-status/end', (_req, res) => {
   try {
-    // Resetear sellos y estadísticas sin borrar la base de datos de usuarios
     const participants = readParticipants().map((p) => ({ ...p, stamps: [] }));
     writeParticipants(participants);
 
@@ -522,7 +569,72 @@ app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
   }
 });
 
-// Comunidad
+// Manage Running Club Endpoints
+app.get('/api/running-challenges', (_req, res) => res.json({ challenges: readRunningChallenges() }));
+app.get('/api/admin/running-status', (_req, res) => res.json({ status: readRunningStatus() }));
+
+app.post('/api/admin/running-status/start', (req, res) => {
+  try {
+    const status = { isActive: true, title: String(req.body.title || 'Active Running Club Season').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+    writeRunningStatus(status);
+    return res.status(201).json({ status });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/admin/running-status/end', (_req, res) => {
+  try {
+    const status = { isActive: false, title: 'Running Season Ended', startedAt: '', endedAt: new Date().toISOString() };
+    writeRunningStatus(status);
+    return res.json({ status });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/admin/running-challenges', (req, res) => {
+  try {
+    const title = String(req.body.title || '').trim();
+    const description = String(req.body.description || '').trim();
+    const points = Number(req.body.points || 12);
+    const scanCode = String(req.body.scanCode || `RUNNING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
+    const proofPrompt = String(req.body.proofPrompt || 'Upload a photo from your run.').trim();
+
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Running title and description are required.' });
+    }
+
+    const challenges = readRunningChallenges();
+    const challenge = {
+      id: crypto.randomUUID(),
+      title,
+      description,
+      points: Number.isFinite(points) && points > 0 ? points : 12,
+      scanCode,
+      proofPrompt
+    };
+
+    challenges.unshift(challenge);
+    writeRunningChallenges(challenges);
+
+    return res.status(201).json({ challenge, challenges });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/api/admin/running-challenges/:id', (req, res) => {
+  try {
+    const challenges = readRunningChallenges().filter((c) => c.id !== req.params.id);
+    writeRunningChallenges(challenges);
+    return res.json({ deleted: true, count: challenges.length, challenges });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// Community
 app.get('/api/admin/community', (_req, res) => {
   return res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) });
 });
@@ -559,7 +671,7 @@ app.post('/api/admin/community', (req, res) => {
   }
 });
 
-// Log Stamp / Activity Check-In (Validación de Campaña Activa)
+// Activity Check-in
 app.post('/api/participants/:id/stamps', (req, res) => {
   try {
     const { id } = req.params;
@@ -567,15 +679,21 @@ app.post('/api/participants/:id/stamps', (req, res) => {
 
     const wellnessStatus = readChallengeStatus();
     const hikingStatus = readHikingStatus();
+    const runningStatus = readRunningStatus();
 
     const cleanCode = String(scanCode || '').trim().toUpperCase();
     const isHikingCode = cleanCode.startsWith('HIKING-');
+    const isRunningCode = cleanCode.startsWith('RUNNING-');
 
     if (isHikingCode && (!hikingStatus || !hikingStatus.isActive)) {
       return res.status(403).json({ message: 'Hiking activity logging is disabled because no active Hiking campaign is running.' });
     }
 
-    if (!isHikingCode && (!wellnessStatus || !wellnessStatus.isActive)) {
+    if (isRunningCode && (!runningStatus || !runningStatus.isActive)) {
+      return res.status(403).json({ message: 'Running activity logging is disabled because no active Running campaign is running.' });
+    }
+
+    if (!isHikingCode && !isRunningCode && (!wellnessStatus || !wellnessStatus.isActive)) {
       return res.status(403).json({ message: 'Wellness activity logging is disabled because no active Wellness campaign is running.' });
     }
 
@@ -586,7 +704,7 @@ app.post('/api/participants/:id/stamps', (req, res) => {
     let finalTitle = title;
     let finalPoints = Number(points || 1);
 
-    const catalog = [...categoryQrConfigurations, ...readSpecialChallenges(), ...readHikingChallenges()];
+    const catalog = [...categoryQrConfigurations, ...readSpecialChallenges(), ...readHikingChallenges(), ...readRunningChallenges()];
     const match = catalog.find((item) => item.code === cleanCode || item.scanCode === cleanCode);
     if (match) {
       finalTitle = match.title;
@@ -656,11 +774,15 @@ app.get('/api/admin/report/csv', (_req, res) => {
   }
 });
 
-// Servir cliente en Express 5
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get('/{*splat}', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+    next();
+  });
 }
 
 const startServer = async () => {
