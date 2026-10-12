@@ -85,6 +85,7 @@ if (!fs.existsSync(challengeStatusPath)) {
 }
 
 const app = express();
+// ASIGNACIÓN DINÁMICA DE PUERTO PARA RENDER
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: true, credentials: true }));
@@ -110,4 +111,14 @@ const writeAdmins = (admins) => writeJson(adminsDbPath, admins);
 const readCommunityPosts = () => readJson(communityDbPath, []);
 const writeCommunityPosts = (posts) => writeJson(communityDbPath, posts);
 const readSpecialChallenges = () => readJson(specialChallengesDbPath, defaultSpecialChallenges);
-const writeSpecialChallenges = (challenges) => writeJson
+const writeSpecialChallenges = (challenges) => writeJson(specialChallengesDbPath, challenges);
+const readChallengeStatus = () => readJson(challengeStatusPath, defaultChallengeStatus);
+const writeChallengeStatus = (status) => writeJson(challengeStatusPath, status);
+
+const SUPERADMIN_EMAIL = 'superadmin@roche.com';
+const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
+
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const { password, passwordPlain, ...rest } = user;
+  return
