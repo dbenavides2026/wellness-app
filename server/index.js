@@ -15,8 +15,6 @@ const adminsDbPath = path.join(dataDir, 'admins.json');
 const communityDbPath = path.join(dataDir, 'community.json');
 const specialChallengesDbPath = path.join(dataDir, 'special-challenges.json');
 const challengeStatusPath = path.join(dataDir, 'challenge-status.json');
-
-// Hiking Club Database Paths
 const hikingChallengesDbPath = path.join(dataDir, 'hiking-challenges.json');
 const hikingStatusPath = path.join(dataDir, 'hiking-status.json');
 
@@ -143,7 +141,7 @@ const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
 
 const sanitizeUser = (user) => {
   if (!user) return null;
-  const { password, passwordPlain, ...rest } = user;
+  const { password, ...rest } = user;
   return rest;
 };
 
@@ -269,6 +267,56 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// FORGOT PASSWORD ENDPOINT (Cross-references database)
+app.post('/api/forgot-password', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!email) return res.status(400).json({ message: 'Please provide an email address.' });
+
+    const participants = readParticipants();
+    const match = participants.find((p) => normalizeEmail(p.email) === email);
+
+    if (!match) {
+      return res.status(404).json({ message: 'No registered user found with that email address.' });
+    }
+
+    const passwordRetrieved = match.passwordPlain || 'Saved password encrypted. Please reset through profile.';
+
+    return res.json({
+      message: `Password retrieved for ${match.email}`,
+      password: passwordRetrieved
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// UPDATE USER PROFILE
+app.put('/api/participants/:id/profile', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, email, password, profileImage } = req.body;
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === id);
+
+    if (idx === -1) return res.status(404).json({ message: 'User not found.' });
+
+    if (fullName) participants[idx].fullName = String(fullName).trim();
+    if (email) participants[idx].email = normalizeEmail(email);
+    if (profileImage !== undefined) participants[idx].profileImage = profileImage;
+
+    if (password && String(password).trim().length >= 6) {
+      participants[idx].password = await bcrypt.hash(String(password).trim(), 10);
+      participants[idx].passwordPlain = String(password).trim();
+    }
+
+    writeParticipants(participants);
+    return res.json({ user: sanitizeUser(participants[idx]), message: 'Profile updated successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 app.post('/api/admin/login', async (req, res) => {
   try {
     await ensureSuperAdmin();
@@ -333,7 +381,6 @@ app.get('/api/admin/stats', (_req, res) => {
   }
 });
 
-// User Management (Admin Portal)
 app.put('/api/admin/participants/:id', (req, res) => {
   try {
     const { id } = req.params;
@@ -388,7 +435,6 @@ app.post('/api/admin/participants/:id/promote', (req, res) => {
   }
 });
 
-// Wellness Challenge Campaigns (Sin borrar base de datos de usuarios)
 app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
 
@@ -404,7 +450,6 @@ app.post('/api/admin/challenge-status/start', (req, res) => {
 
 app.post('/api/admin/challenge-status/end', (_req, res) => {
   try {
-    // Resetear sellos y estadísticas sin borrar la base de datos de usuarios
     const participants = readParticipants().map((p) => ({ ...p, stamps: [] }));
     writeParticipants(participants);
 
@@ -457,7 +502,6 @@ app.delete('/api/admin/challenges/:id', (req, res) => {
   }
 });
 
-// Manage Hiking Club Endpoints
 app.get('/api/hiking-challenges', (_req, res) => res.json({ challenges: readHikingChallenges() }));
 app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
 
@@ -522,7 +566,6 @@ app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
   }
 });
 
-// Comunidad
 app.get('/api/admin/community', (_req, res) => {
   return res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) });
 });
@@ -559,7 +602,6 @@ app.post('/api/admin/community', (req, res) => {
   }
 });
 
-// Log Stamp / Activity Check-In (Validación de Campaña Activa)
 app.post('/api/participants/:id/stamps', (req, res) => {
   try {
     const { id } = req.params;
@@ -656,7 +698,6 @@ app.get('/api/admin/report/csv', (_req, res) => {
   }
 });
 
-// Servir cliente en Express 5
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
