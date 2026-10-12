@@ -54,6 +54,28 @@ const categories = [
   }
 ];
 
+const hikingCategories = [
+  {
+    id: 'hiking-club-checkin',
+    title: 'Hiking Club Expedition',
+    points: 3,
+    iconType: 'mountain',
+    scanCode: 'HIKING-CLUB-101',
+    proofPrompt: 'Upload a photo from your trail or summit check-in.'
+  }
+];
+
+const runningCategories = [
+  {
+    id: 'running-club-checkin',
+    title: 'Running Club Session',
+    points: 3,
+    iconType: 'trophy',
+    scanCode: 'RUNNING-CLUB-101',
+    proofPrompt: 'Upload a photo from your running session.'
+  }
+];
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
     headers: {
@@ -110,39 +132,20 @@ export default function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
+
   const [specialChallenges, setSpecialChallenges] = useState([]);
-  const [challengeStatus, setChallengeStatus] = useState({
-    isActive: false,
-    title: 'No active challenge',
-    startedAt: '',
-    endedAt: ''
-  });
+  const [challengeStatus, setChallengeStatus] = useState({ isActive: false, title: 'No active challenge' });
 
   const [hikingChallenges, setHikingChallenges] = useState([]);
-  const [hikingStatus, setHikingStatus] = useState({
-    isActive: false,
-    title: 'No active hiking season',
-    startedAt: '',
-    endedAt: ''
-  });
+  const [hikingStatus, setHikingStatus] = useState({ isActive: false, title: 'No active hiking season' });
 
-  const [challengeForm, setChallengeForm] = useState({
-    title: '',
-    description: '',
-    points: 10,
-    scanCode: '',
-    proofPrompt: ''
-  });
+  const [runningChallenges, setRunningChallenges] = useState([]);
+  const [runningStatus, setRunningStatus] = useState({ isActive: false, title: 'No active running season' });
 
-  const [hikingForm, setHikingForm] = useState({
-    title: '',
-    description: '',
-    points: 15,
-    scanCode: '',
-    proofPrompt: ''
-  });
+  const [challengeForm, setChallengeForm] = useState({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
+  const [hikingForm, setHikingForm] = useState({ title: '', description: '', points: 15, scanCode: '', proofPrompt: '' });
+  const [runningForm, setRunningForm] = useState({ title: '', description: '', points: 12, scanCode: '', proofPrompt: '' });
 
-  const [editingChallengeId, setEditingChallengeId] = useState(null);
   const [categorySelections, setCategorySelections] = useState({});
   const [scanEntries, setScanEntries] = useState({});
   const [proofs, setProofs] = useState({});
@@ -159,13 +162,15 @@ export default function App() {
   const refreshAllData = async () => {
     try {
       const t = Date.now();
-      const [parts, comms, chs, status, hChs, hStatus] = await Promise.all([
+      const [parts, comms, chs, status, hChs, hStatus, rChs, rStatus] = await Promise.all([
         fetchJson(`/api/participants?t=${t}`),
         fetchJson(`/api/admin/community?t=${t}`),
         fetchJson(`/api/challenges?t=${t}`),
         fetchJson(`/api/admin/challenge-status?t=${t}`),
         fetchJson(`/api/hiking-challenges?t=${t}`),
-        fetchJson(`/api/admin/hiking-status?t=${t}`)
+        fetchJson(`/api/admin/hiking-status?t=${t}`),
+        fetchJson(`/api/running-challenges?t=${t}`),
+        fetchJson(`/api/admin/running-status?t=${t}`)
       ]);
 
       const updatedParticipants = parts.participants || [];
@@ -173,9 +178,11 @@ export default function App() {
       setCommunityPosts(comms.posts || []);
       setAdminCommunityPosts(comms.posts || []);
       setSpecialChallenges(chs.challenges || []);
-      setChallengeStatus(status.status || { isActive: false, title: 'No active challenge' });
+      setChallengeStatus(status.status || { isActive: false });
       setHikingChallenges(hChs.challenges || []);
-      setHikingStatus(hStatus.status || { isActive: false, title: 'No active hiking season' });
+      setHikingStatus(hStatus.status || { isActive: false });
+      setRunningChallenges(rChs.challenges || []);
+      setRunningStatus(rStatus.status || { isActive: false });
 
       if (currentUser?.id) {
         const freshUser = updatedParticipants.find((p) => p.id === currentUser.id);
@@ -259,7 +266,18 @@ export default function App() {
 
   const addStampWithCode = async (activity, directCode = '') => {
     if (!currentUser) return;
-    const codeToSend = directCode || scanEntries[activity.id] || activity.scanCode || '';
+    const codeToSend = (directCode || scanEntries[activity.id] || '').trim().toUpperCase();
+    const expectedCode = (activity.scanCode || '').trim().toUpperCase();
+
+    if (!codeToSend) {
+      setFormError('No QR code detected. Please scan the QR code first.');
+      return;
+    }
+
+    if (expectedCode && codeToSend !== expectedCode) {
+      setFormError(`Invalid QR code. Scanned "${codeToSend}", but "${activity.title}" requires "${expectedCode}".`);
+      return;
+    }
 
     try {
       const res = await fetchJson(`/api/participants/${currentUser.id}/stamps`, {
@@ -312,18 +330,29 @@ export default function App() {
         c.height = v.videoHeight || 480;
         ctx.drawImage(v, 0, 0, c.width, c.height);
         const decoded = jsQR(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+
         if (decoded) {
           const val = decoded.data.trim().toUpperCase();
+          const targetCategory = categories.find((cat) => cat.id === scannerCategoryId)
+            || hikingCategories.find((hc) => hc.id === scannerCategoryId)
+            || runningCategories.find((rc) => rc.id === scannerCategoryId)
+            || specialChallenges.find((sc) => sc.id === scannerCategoryId)
+            || hikingChallenges.find((hc) => hc.id === scannerCategoryId)
+            || runningChallenges.find((rc) => rc.id === scannerCategoryId);
+
+          const expected = (targetCategory?.scanCode || '').trim().toUpperCase();
+
+          if (expected && val !== expected) {
+            setScannerError(`Invalid QR Code! Scanned code does not match "${targetCategory?.title}".`);
+            if (!cancelled) animId = window.requestAnimationFrame(scanFrame);
+            return;
+          }
+
           setScanEntries((prev) => ({ ...prev, [scannerCategoryId]: val }));
           setCategorySelections((prev) => ({ ...prev, [scannerCategoryId]: { method: 'scan' } }));
           stopStream();
           setScannerCategoryId(null);
           setScannerError('');
-
-          const targetCategory = categories.find((cat) => cat.id === scannerCategoryId)
-            || specialChallenges.find((sc) => sc.id === scannerCategoryId)
-            || hikingChallenges.find((hc) => hc.id === scannerCategoryId)
-            || { id: scannerCategoryId, title: 'QR Check-in', points: 1 };
 
           addStampWithCode(targetCategory, val);
           return;
@@ -355,7 +384,7 @@ export default function App() {
       window.cancelAnimationFrame(animId);
       stopStream();
     };
-  }, [scannerCategoryId]);
+  }, [scannerCategoryId, specialChallenges, hikingChallenges, runningChallenges]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -420,11 +449,6 @@ export default function App() {
     }
   };
 
-  const handleEditUser = (user) => {
-    setEditingParticipantId(user.id);
-    setEditingParticipantDraft({ fullName: user.fullName, email: user.email, role: user.role || 'participant' });
-  };
-
   const handleSaveUser = async () => {
     try {
       await fetchJson(`/api/admin/participants/${editingParticipantId}`, {
@@ -449,6 +473,42 @@ export default function App() {
       await refreshAdminData();
     } catch (error) {
       setAdminMessage(error.message || 'Unable to delete user.');
+    }
+  };
+
+  const handleDeleteSpecialActivity = async (id) => {
+    if (!window.confirm('Delete this special activity?')) return;
+    try {
+      await fetchJson(`/api/admin/challenges/${id}`, { method: 'DELETE' });
+      setAdminMessage('Special activity deleted.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete activity.');
+    }
+  };
+
+  const handleDeleteHikingActivity = async (id) => {
+    if (!window.confirm('Delete this hiking activity?')) return;
+    try {
+      await fetchJson(`/api/admin/hiking-challenges/${id}`, { method: 'DELETE' });
+      setAdminMessage('Hiking activity deleted.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete activity.');
+    }
+  };
+
+  const handleDeleteRunningActivity = async (id) => {
+    if (!window.confirm('Delete this running activity?')) return;
+    try {
+      await fetchJson(`/api/admin/running-challenges/${id}`, { method: 'DELETE' });
+      setAdminMessage('Running activity deleted.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete activity.');
     }
   };
 
@@ -542,7 +602,7 @@ export default function App() {
       });
 
       setChallengeForm({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
-      setAdminMessage('Wellness Special activity saved successfully.');
+      setAdminMessage('Special activity saved successfully.');
       await refreshAllData();
       await refreshAdminData();
     } catch (error) {
@@ -577,6 +637,33 @@ export default function App() {
     }
   };
 
+  const handleSaveRunningChallenge = async () => {
+    const title = runningForm.title.trim();
+    const description = runningForm.description.trim();
+    if (!title || !description) {
+      setAdminMessage('Running title and description are required.');
+      return;
+    }
+
+    try {
+      await fetchJson('/api/admin/running-challenges', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...runningForm,
+          points: Number(runningForm.points) || 12,
+          proofPrompt: runningForm.proofPrompt.trim() || 'Upload a photo proof.'
+        })
+      });
+
+      setRunningForm({ title: '', description: '', points: 12, scanCode: '', proofPrompt: '' });
+      setAdminMessage('Running activity saved successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to save running activity.');
+    }
+  };
+
   const handleStartChallenge = async () => {
     try {
       const response = await fetchJson('/api/admin/challenge-status/start', {
@@ -595,7 +682,7 @@ export default function App() {
     try {
       const response = await fetchJson('/api/admin/challenge-status/end', { method: 'POST' });
       setChallengeStatus(response.status || challengeStatus);
-      setAdminMessage('Wellness Challenge campaign closed. Users retained, activity logs cleared.');
+      setAdminMessage('Wellness Challenge campaign closed. Activity logs cleared.');
       await refreshAllData();
     } catch (error) {
       setAdminMessage(error.message || 'Unable to end campaign.');
@@ -627,10 +714,38 @@ export default function App() {
     }
   };
 
+  const handleStartRunningSeason = async () => {
+    try {
+      const response = await fetchJson('/api/admin/running-status/start', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Active Running Season Campaign' })
+      });
+      setRunningStatus(response.status || runningStatus);
+      setAdminMessage('New Running Season started.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to start running season.');
+    }
+  };
+
+  const handleEndRunningSeason = async () => {
+    try {
+      const response = await fetchJson('/api/admin/running-status/end', { method: 'POST' });
+      setRunningStatus(response.status || runningStatus);
+      setAdminMessage('Running Season closed.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to end running season.');
+    }
+  };
+
   const getStampBadge = (title) => {
     const normalized = String(title || '').toLowerCase();
     if (normalized.includes('hiking') || normalized.includes('summit')) {
       return { Icon: Mountain, background: 'rgba(21, 128, 61, 0.12)', color: '#15803d' };
+    }
+    if (normalized.includes('running') || normalized.includes('run')) {
+      return { Icon: Trophy, background: 'rgba(180, 83, 9, 0.12)', color: '#b45309' };
     }
     if (normalized.includes('challenge') || normalized.includes('sprint') || normalized.includes('boost') || normalized.includes('outdoor') || normalized.includes('move')) {
       return { Icon: Sparkles, background: 'rgba(245, 158, 11, 0.12)', color: '#b45309' };
@@ -732,17 +847,18 @@ export default function App() {
           </header>
 
           <nav className="admin-top-nav">
-            <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Admin</button>
+            <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Overview</button>
             <button type="button" className={adminTab === 'users' ? 'active' : ''} onClick={() => setAdminTab('users')}>User management</button>
             <button type="button" className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Wellness Challenge</button>
             <button type="button" className={adminTab === 'hiking' ? 'active' : ''} onClick={() => setAdminTab('hiking')}>Manage Hiking Club</button>
+            <button type="button" className={adminTab === 'running' ? 'active' : ''} onClick={() => setAdminTab('running')}>Manage Running Club</button>
             <button type="button" className={adminTab === 'community' ? 'active' : ''} onClick={() => setAdminTab('community')}>Community management</button>
             <button type="button" className={adminTab === 'qr' ? 'active' : ''} onClick={() => setAdminTab('qr')}>Category QR codes</button>
           </nav>
 
           {adminMessage ? <p className="auth-message success" style={{ margin: '1rem 0' }}>{adminMessage}</p> : null}
 
-          {/* OVERVIEW PRINCIPAL */}
+          {/* OVERVIEW */}
           {adminTab === 'admin' && (
             <>
               <section className="admin-metrics">
@@ -792,7 +908,6 @@ export default function App() {
                 </div>
               </section>
 
-              {/* REPORT CON BOTONES DE ACCIÓN */}
               <section className="admin-panel report-panel">
                 <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3>Wellness Challenge participants</h3>
@@ -851,7 +966,7 @@ export default function App() {
             </>
           )}
 
-          {/* SECCIÓN USER MANAGEMENT */}
+          {/* USER MANAGEMENT */}
           {adminTab === 'users' && (
             <section className="admin-panel assignment-panel">
               <div className="section-heading">
@@ -882,7 +997,7 @@ export default function App() {
             </section>
           )}
 
-          {/* SECCIÓN MANAGE WELLNESS CHALLENGE */}
+          {/* MANAGE WELLNESS CHALLENGE */}
           {adminTab === 'challenge' && (
             <section className="admin-panel special-challenges-panel">
               <div className="section-heading"><h3>Manage Wellness Challenge</h3></div>
@@ -908,10 +1023,13 @@ export default function App() {
                 <div className="special-challenges-list">
                   {specialChallenges.length === 0 ? <div className="empty-state">No special activities configured yet.</div> : (
                     specialChallenges.map((ch) => (
-                      <div key={ch.id} className="admin-community-item">
-                        <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
-                        <p>{ch.description}</p>
-                        <small className="challenge-code">{ch.scanCode}</small>
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <small className="challenge-code">{ch.scanCode}</small>
+                        </div>
+                        <button type="button" className="icon-button delete-button" onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
                   )}
@@ -920,7 +1038,7 @@ export default function App() {
             </section>
           )}
 
-          {/* NUEVA SECCIÓN: MANAGE HIKING CLUB */}
+          {/* MANAGE HIKING CLUB */}
           {adminTab === 'hiking' && (
             <section className="admin-panel special-challenges-panel">
               <div className="section-heading"><h3>Manage Hiking Club</h3></div>
@@ -946,10 +1064,54 @@ export default function App() {
                 <div className="special-challenges-list">
                   {hikingChallenges.length === 0 ? <div className="empty-state">No hiking activities configured yet.</div> : (
                     hikingChallenges.map((ch) => (
-                      <div key={ch.id} className="admin-community-item">
-                        <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
-                        <p>{ch.description}</p>
-                        <small className="challenge-code">{ch.scanCode}</small>
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <small className="challenge-code">{ch.scanCode}</small>
+                        </div>
+                        <button type="button" className="icon-button delete-button" onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* MANAGE RUNNING CLUB */}
+          {adminTab === 'running' && (
+            <section className="admin-panel special-challenges-panel">
+              <div className="section-heading"><h3>Manage Running Club</h3></div>
+              <div className="challenge-status-card">
+                <div className="challenge-status-copy">
+                  <span className={`challenge-status-pill ${runningStatus.isActive ? 'live' : 'paused'}`}>{runningStatus.isActive ? 'Active Running Season' : 'Running Season Closed'}</span>
+                  <strong>{runningStatus.title || 'No active running season'}</strong>
+                </div>
+                <div className="admin-challenge-actions">
+                  <button type="button" className="secondary-button" onClick={handleEndRunningSeason}>End Running Campaign</button>
+                  <button type="button" className="primary-button" onClick={handleStartRunningSeason}>Start New Running Campaign</button>
+                </div>
+              </div>
+
+              <div className="section-heading special-activities-heading"><h3>Add Running Activity</h3></div>
+              <div className="special-challenges-layout">
+                <div className="special-challenges-form">
+                  <label><span className="input-label">Run Title</span><input type="text" value={runningForm.title} onChange={(e) => setRunningForm({ ...runningForm, title: e.target.value })} placeholder="5K Morning Sprint" /></label>
+                  <label><span className="input-label">Description</span><textarea value={runningForm.description} onChange={(e) => setRunningForm({ ...runningForm, description: e.target.value })} placeholder="Describe route and distance..." /></label>
+                  <label><span className="input-label">Points</span><input type="number" min="1" value={runningForm.points} onChange={(e) => setRunningForm({ ...runningForm, points: e.target.value })} /></label>
+                  <button type="button" className="primary-button" onClick={handleSaveRunningChallenge}>Add Running Activity</button>
+                </div>
+                <div className="special-challenges-list">
+                  {runningChallenges.length === 0 ? <div className="empty-state">No running activities configured yet.</div> : (
+                    runningChallenges.map((ch) => (
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <small className="challenge-code">{ch.scanCode}</small>
+                        </div>
+                        <button type="button" className="icon-button delete-button" onClick={() => handleDeleteRunningActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
                   )}
@@ -1013,6 +1175,8 @@ export default function App() {
               <button type="button" className={`portal-nav-button ${activePortalTab === 'passport' ? 'active' : ''}`} onClick={() => setActivePortalTab('passport')}>Digital Passport</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'community' ? 'active' : ''}`} onClick={() => setActivePortalTab('community')}>Wellness Community</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'challenge' ? 'active' : ''}`} onClick={() => setActivePortalTab('challenge')}>Special Activities</button>
+              <button type="button" className={`portal-nav-button ${activePortalTab === 'hiking' ? 'active' : ''}`} onClick={() => setActivePortalTab('hiking')}>Hiking Club</button>
+              <button type="button" className={`portal-nav-button ${activePortalTab === 'running' ? 'active' : ''}`} onClick={() => setActivePortalTab('running')}>Running Club</button>
             </div>
           </nav>
 
@@ -1185,12 +1349,12 @@ export default function App() {
 
                 {!selectedChallenge ? (
                   <div className="challenge-grid">
-                    {[...specialChallenges, ...hikingChallenges].length === 0 ? (
+                    {specialChallenges.length === 0 ? (
                       <div className="empty-state">No special activities available at the moment.</div>
                     ) : (
-                      [...specialChallenges, ...hikingChallenges].map((challenge) => (
+                      specialChallenges.map((challenge) => (
                         <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
-                          <span className="challenge-tag">{challenge.scanCode?.startsWith('HIKING') ? 'Hiking Club' : 'Special'}</span>
+                          <span className="challenge-tag">Special</span>
                           <h3>{challenge.title}</h3>
                           <p>{challenge.description}</p>
                           <strong>Reward: {challenge.points} pts</strong>
@@ -1241,13 +1405,191 @@ export default function App() {
                         type="button"
                         className="log-button"
                         onClick={() => addStamp(selectedChallenge)}
-                        disabled={selectedChallenge.scanCode?.startsWith('HIKING') ? !hikingStatus.isActive : !challengeStatus.isActive}
+                        disabled={!challengeStatus.isActive}
                       >
                         <PlusCircle className="button-icon" /> Log in Activity
                       </button>
                     </div>
                   </div>
                 )}
+              </section>
+            )}
+
+            {/* HIKING CLUB TAB */}
+            {activePortalTab === 'hiking' && (
+              <section className="challenge-panel">
+                <div className="section-heading">
+                  <h3>Hiking Club Expeditions</h3>
+                </div>
+
+                <main className="category-list" style={{ marginBottom: '2rem' }}>
+                  {hikingCategories.map((category) => {
+                    const method = categorySelections[category.id]?.method || 'scan';
+                    const scanValue = (scanEntries[category.id] || '').trim().toUpperCase();
+                    const isReady = method === 'scan' ? Boolean(scanValue) : Boolean(proofs[category.id]);
+                    const canLogActivity = hikingStatus.isActive && isReady;
+
+                    return (
+                      <article key={category.id} className="category-card">
+                        <div className="card-topline">
+                          <div className="category-title-wrap">
+                            <div className="icon-badge" style={{ background: 'rgba(21, 128, 61, 0.12)', color: '#15803d' }}>
+                              <Mountain className="category-icon" />
+                            </div>
+                            <div>
+                              <h2>{category.title}</h2>
+                              <p>+{category.points} points</p>
+                            </div>
+                          </div>
+                          <span className={`status-pill ${isReady ? 'success' : 'pending'}`}>
+                            {isReady ? <CheckCircle2 className="status-icon" /> : <Camera className="status-icon" />}
+                            {isReady ? 'Ready' : 'Proof required'}
+                          </span>
+                        </div>
+
+                        <div className="method-toggle">
+                          <button type="button" className={method === 'scan' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'scan' } }))}>
+                            <ScanLine className="button-icon" /> Scan code
+                          </button>
+                          <button type="button" className={method === 'upload' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }))}>
+                            <Upload className="button-icon" /> Upload proof
+                          </button>
+                        </div>
+
+                        {method === 'scan' ? (
+                          <div className="scan-box">
+                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                              <ScanLine className="button-icon" /> Scan hiking QR with camera
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="upload-box">
+                            <input type="file" accept="image/*" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setProofs((prev) => ({ ...prev, [category.id]: URL.createObjectURL(file) }));
+                                setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }));
+                              }
+                            }} />
+                            <span className="upload-hint">{category.proofPrompt}</span>
+                          </label>
+                        )}
+
+                        <button type="button" className="log-button" onClick={() => addStamp(category)} disabled={!canLogActivity}>
+                          <PlusCircle className="button-icon" /> Log Hiking Activity
+                        </button>
+                      </article>
+                    );
+                  })}
+                </main>
+
+                <div className="section-heading" style={{ marginTop: '1rem' }}>
+                  <h3>Scheduled Hikes & Trails</h3>
+                </div>
+
+                <div className="challenge-grid">
+                  {hikingChallenges.length === 0 ? (
+                    <div className="empty-state">No specific hike events configured yet.</div>
+                  ) : (
+                    hikingChallenges.map((challenge) => (
+                      <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
+                        <span className="challenge-tag" style={{ background: '#15803d' }}>Hiking Club</span>
+                        <h3>{challenge.title}</h3>
+                        <p>{challenge.description}</p>
+                        <strong>Reward: {challenge.points} pts</strong>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* RUNNING CLUB TAB */}
+            {activePortalTab === 'running' && (
+              <section className="challenge-panel">
+                <div className="section-heading">
+                  <h3>Running Club Sessions</h3>
+                </div>
+
+                <main className="category-list" style={{ marginBottom: '2rem' }}>
+                  {runningCategories.map((category) => {
+                    const method = categorySelections[category.id]?.method || 'scan';
+                    const scanValue = (scanEntries[category.id] || '').trim().toUpperCase();
+                    const isReady = method === 'scan' ? Boolean(scanValue) : Boolean(proofs[category.id]);
+                    const canLogActivity = runningStatus.isActive && isReady;
+
+                    return (
+                      <article key={category.id} className="category-card">
+                        <div className="card-topline">
+                          <div className="category-title-wrap">
+                            <div className="icon-badge" style={{ background: 'rgba(180, 83, 9, 0.12)', color: '#b45309' }}>
+                              <Trophy className="category-icon" />
+                            </div>
+                            <div>
+                              <h2>{category.title}</h2>
+                              <p>+{category.points} points</p>
+                            </div>
+                          </div>
+                          <span className={`status-pill ${isReady ? 'success' : 'pending'}`}>
+                            {isReady ? <CheckCircle2 className="status-icon" /> : <Camera className="status-icon" />}
+                            {isReady ? 'Ready' : 'Proof required'}
+                          </span>
+                        </div>
+
+                        <div className="method-toggle">
+                          <button type="button" className={method === 'scan' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'scan' } }))}>
+                            <ScanLine className="button-icon" /> Scan code
+                          </button>
+                          <button type="button" className={method === 'upload' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }))}>
+                            <Upload className="button-icon" /> Upload proof
+                          </button>
+                        </div>
+
+                        {method === 'scan' ? (
+                          <div className="scan-box">
+                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                              <ScanLine className="button-icon" /> Scan running QR with camera
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="upload-box">
+                            <input type="file" accept="image/*" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setProofs((prev) => ({ ...prev, [category.id]: URL.createObjectURL(file) }));
+                                setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }));
+                              }
+                            }} />
+                            <span className="upload-hint">{category.proofPrompt}</span>
+                          </label>
+                        )}
+
+                        <button type="button" className="log-button" onClick={() => addStamp(category)} disabled={!canLogActivity}>
+                          <PlusCircle className="button-icon" /> Log Running Activity
+                        </button>
+                      </article>
+                    );
+                  })}
+                </main>
+
+                <div className="section-heading" style={{ marginTop: '1rem' }}>
+                  <h3>Scheduled Running Events</h3>
+                </div>
+
+                <div className="challenge-grid">
+                  {runningChallenges.length === 0 ? (
+                    <div className="empty-state">No specific running events configured yet.</div>
+                  ) : (
+                    runningChallenges.map((challenge) => (
+                      <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
+                        <span className="challenge-tag" style={{ background: '#b45309' }}>Running Club</span>
+                        <h3>{challenge.title}</h3>
+                        <p>{challenge.description}</p>
+                        <strong>Reward: {challenge.points} pts</strong>
+                      </article>
+                    ))
+                  )}
+                </div>
               </section>
             )}
 
