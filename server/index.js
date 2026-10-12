@@ -72,7 +72,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
-// Middleware para evitar que los teléfonos guarden respuestas antiguas en caché
+// Anti-cache headers middleware for API routes
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -176,7 +176,7 @@ const ensureSuperAdmin = async () => {
   writeAdmins(admins);
 };
 
-// --- RUTAS DE LA API ---
+// API Endpoints
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'wellness-passport-api' }));
 app.get('/api/participants', (_req, res) => res.json({ participants: readParticipants().map(sanitizeUser) }));
 
@@ -475,12 +475,11 @@ app.get('/api/admin/report/csv', (_req, res) => {
   }
 });
 
-// --- SERVIR ARCHIVOS ESTÁTICOS DE REACT ---
+// Serve Vite React production client (Express 5 wildcards)
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  // Ruta estándar compatible con todas las versiones de Express
-  app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  app.get('/{*splat}', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
 const startServer = async () => {
