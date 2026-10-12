@@ -352,6 +352,34 @@ export default function App() {
     setAdminMessage('');
   };
 
+  const handleCommunityImageUpload = (file) => {
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setCommunityDraft((prev) => ({ ...prev, image: previewUrl }));
+  };
+
+  const handleCommunityPostSubmit = () => {
+    const message = communityDraft.message.trim();
+    if (!message && !communityDraft.image) return;
+
+    const author = currentUser?.fullName || adminUser?.fullName || 'Community Member';
+    const role = currentUser ? 'participant' : adminUser?.role || 'participant';
+
+    setCommunityPosts((prev) => [
+      {
+        id: Date.now(),
+        author,
+        role,
+        message,
+        image: communityDraft.image,
+        createdAt: 'Just now'
+      },
+      ...prev
+    ]);
+
+    setCommunityDraft({ message: '', image: '' });
+  };
+
   const addStamp = async (activity) => {
     if (!currentUser) return;
     try {
@@ -511,6 +539,7 @@ export default function App() {
           </nav>
 
           <div className="portal-content">
+            {/* DIGITAL PASSPORT TAB */}
             {activePortalTab === 'passport' && (
               <>
                 <header className="passport-header">
@@ -618,28 +647,132 @@ export default function App() {
               </>
             )}
 
-            {activePortalTab === 'challenge' && (
-              <section className="challenge-panel">
-                <div className="section-heading"><h3>Special Activities</h3></div>
-                <div className="challenge-grid">
-                  {specialChallenges.length === 0 ? (
-                    <div className="empty-state">No special activities available yet.</div>
+            {/* WELLNESS COMMUNITY TAB */}
+            {activePortalTab === 'community' && (
+              <section className="community-panel">
+                <div className="section-heading">
+                  <h3>Wellness Community</h3>
+                </div>
+
+                <div className="community-composer">
+                  <textarea
+                    value={communityDraft.message}
+                    onChange={(event) => setCommunityDraft((prev) => ({ ...prev, message: event.target.value }))}
+                    placeholder="Share a progress update, encourage peers, or post a workout moment..."
+                  />
+                  <div className="community-actions">
+                    <label className="upload-button">
+                      <Upload className="button-icon" /> Add photo
+                      <input type="file" accept="image/*" onChange={(event) => handleCommunityImageUpload(event.target.files?.[0])} />
+                    </label>
+                    <button type="button" className="primary-button small-action" onClick={handleCommunityPostSubmit}>
+                      Post update
+                    </button>
+                  </div>
+                  {communityDraft.image ? (
+                    <div className="community-preview-wrap">
+                      <img src={communityDraft.image} alt="Upload preview" className="community-preview" />
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="community-feed">
+                  {communityPosts.length === 0 ? (
+                    <div className="empty-state">No community posts yet. Be the first to share an update!</div>
                   ) : (
-                    specialChallenges.map((challenge) => (
-                      <article key={challenge.id} className="challenge-card">
-                        <span className="challenge-tag">Special</span>
-                        <h3>{challenge.title}</h3>
-                        <p>{challenge.description}</p>
-                        <strong>Reward: {challenge.points} pts</strong>
-                        <button type="button" className="log-button" onClick={() => addStamp(challenge)} disabled={!challengeStatus.isActive}>
-                          <PlusCircle className="button-icon" /> Log in Activity
-                        </button>
+                    communityPosts.map((post) => (
+                      <article key={post.id} className="community-post">
+                        <div className="community-post-header">
+                          <div>
+                            <strong>{post.author}</strong>
+                            <small>{post.role === 'admin' ? 'Admin' : 'Participant'}</small>
+                          </div>
+                          <span>{post.createdAt}</span>
+                        </div>
+                        {post.message ? <p>{post.message}</p> : null}
+                        {post.image ? <img src={post.image} alt="Post content" className="community-post-image" /> : null}
                       </article>
                     ))
                   )}
                 </div>
               </section>
             )}
+
+            {/* SPECIAL ACTIVITIES TAB */}
+            {activePortalTab === 'challenge' && (
+              <section className="challenge-panel">
+                <div className="section-heading">
+                  <h3>Special Activities</h3>
+                </div>
+
+                {!selectedChallenge ? (
+                  <div className="challenge-grid">
+                    {specialChallenges.length === 0 ? (
+                      <div className="empty-state">No special activities available at the moment.</div>
+                    ) : (
+                      specialChallenges.map((challenge) => (
+                        <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
+                          <span className="challenge-tag">Special</span>
+                          <h3>{challenge.title}</h3>
+                          <p>{challenge.description}</p>
+                          <strong>Reward: {challenge.points} pts</strong>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="challenge-detail">
+                    <div className="section-heading challenge-detail-header">
+                      <h3>{selectedChallenge.title}</h3>
+                      <button type="button" className="secondary-button small-action" onClick={() => setSelectedChallenge(null)}>
+                        Back to activities
+                      </button>
+                    </div>
+
+                    <div className="challenge-detail-card">
+                      <p>{selectedChallenge.description}</p>
+                      <div className="scan-box challenge-scan-box">
+                        <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(selectedChallenge.id)}>
+                          <ScanLine className="button-icon" /> Scan activity QR
+                        </button>
+                        <div className="scan-meta">Reward: +{selectedChallenge.points} pts</div>
+                      </div>
+
+                      <label className="upload-box challenge-upload-box">
+                        <span className="upload-label">Photo proof</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setProofs((prev) => ({ ...prev, [selectedChallenge.id]: URL.createObjectURL(file) }));
+                            }
+                          }}
+                        />
+                        <span className="upload-hint">{selectedChallenge.proofPrompt || 'Upload a photo proof'}</span>
+                      </label>
+
+                      {proofs[selectedChallenge.id] ? (
+                        <div className="proof-preview-wrap">
+                          <img src={proofs[selectedChallenge.id]} alt="Proof preview" className="proof-preview" />
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        className="log-button"
+                        onClick={() => addStamp(selectedChallenge)}
+                        disabled={!challengeStatus.isActive}
+                      >
+                        <PlusCircle className="button-icon" /> Log in Activity
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
           </div>
         </div>
       </div>
