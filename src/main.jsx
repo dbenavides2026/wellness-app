@@ -3,10 +3,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
-// Unregister service workers and clear cache for mobile shortcuts
+// Clear Service Workers and Cache Storage for mobile shortcuts
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (let registration of registrations) {
+    for (const registration of registrations) {
       registration.unregister();
     }
   });
@@ -14,7 +14,7 @@ if ('serviceWorker' in navigator) {
 
 if ('caches' in window) {
   caches.keys().then((names) => {
-    for (let name of names) {
+    for (const name of names) {
       caches.delete(name);
     }
   });
