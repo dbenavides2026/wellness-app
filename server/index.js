@@ -145,11 +145,11 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/community', (_req, res) => res.json({ posts: readCommunityPosts() }));
 
-// --- SERVIR FRONTEND ESTÁTICO DE REACT ---
+// --- SERVIR FRONTEND ESTÁTICO DE REACT (COMPATIBLE CON EXPRESS 5) ---
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  app.get('/{*splat}', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
 const startServer = async () => {
