@@ -154,7 +154,6 @@ export default function App() {
     proofPrompt: ''
   });
 
-  const [editingChallengeId, setEditingChallengeId] = useState(null);
   const [categorySelections, setCategorySelections] = useState({});
   const [scanEntries, setScanEntries] = useState({});
   const [proofs, setProofs] = useState({});
@@ -288,6 +287,13 @@ export default function App() {
     if (!currentUser) return;
     const codeToSend = directCode || scanEntries[activity.id] || activity.scanCode || '';
 
+    // STRICT HIKING VALIDATION
+    const isHikingTab = activePortalTab === 'hiking' || activity.id === 'hiking-club-checkin' || codeToSend.startsWith('HIKING-');
+    if (isHikingTab && !codeToSend.startsWith('HIKING-')) {
+      setFormError('Invalid Hiking QR code. Please scan a designated Hiking Club QR code.');
+      return;
+    }
+
     try {
       const res = await fetchJson(`/api/participants/${currentUser.id}/stamps`, {
         method: 'POST',
@@ -341,6 +347,13 @@ export default function App() {
         const decoded = jsQR(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
         if (decoded) {
           const val = decoded.data.trim().toUpperCase();
+
+          // Validate Hiking strict match if scanning inside Hiking Club tab
+          if (activePortalTab === 'hiking' && !val.startsWith('HIKING-')) {
+            setScannerError('Invalid QR: Scanned code is not a Hiking Club code.');
+            return;
+          }
+
           setScanEntries((prev) => ({ ...prev, [scannerCategoryId]: val }));
           setCategorySelections((prev) => ({ ...prev, [scannerCategoryId]: { method: 'scan' } }));
           stopStream();
@@ -383,7 +396,7 @@ export default function App() {
       window.cancelAnimationFrame(animId);
       stopStream();
     };
-  }, [scannerCategoryId]);
+  }, [scannerCategoryId, activePortalTab]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -844,8 +857,8 @@ export default function App() {
             <button type="button" className="logout-button" onClick={handleAdminLogout}><LogOut className="button-icon" /> Log out</button>
           </header>
 
-          <nav className="admin-top-nav">
-            <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Admin</button>
+          <nav className="admin-top-nav" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+            <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Overview</button>
             <button type="button" className={adminTab === 'users' ? 'active' : ''} onClick={() => setAdminTab('users')}>User management</button>
             <button type="button" className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Wellness Challenge</button>
             <button type="button" className={adminTab === 'hiking' ? 'active' : ''} onClick={() => setAdminTab('hiking')}>Manage Hiking Club</button>
@@ -866,7 +879,7 @@ export default function App() {
               </section>
 
               <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', margin: '1.5rem 0' }}>
-                <div className="admin-panel chart-panel">
+                <div className="admin-panel chart-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.25rem', border: '1px solid #e2e8f0' }}>
                   <h3>Category activity</h3>
                   {categoryEntries.length === 0 ? (
                     <div className="empty-state">No category activity yet.</div>
@@ -874,18 +887,18 @@ export default function App() {
                     <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                       {categoryEntries.map(([key, count]) => (
                         <div key={key} className="bar-row">
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{key}</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>{key}</span>
                           <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
                             <div className="bar-fill" style={{ width: `${(Number(count || 0) / maxCategoryCount) * 100}%`, background: '#0b41cd', height: '100%' }} />
                           </div>
-                          <strong>{count}</strong>
+                          <strong style={{ color: '#0f172a' }}>{count}</strong>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="admin-panel chart-panel">
+                <div className="admin-panel chart-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.25rem', border: '1px solid #e2e8f0' }}>
                   <h3>Top 10 users by total points</h3>
                   {topUsers.length === 0 ? (
                     <div className="empty-state">No point totals yet.</div>
@@ -893,11 +906,11 @@ export default function App() {
                     <div className="bar-chart user-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                       {topUsers.map((entry) => (
                         <div key={entry.id} className="bar-row">
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{entry.fullName}</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>{entry.fullName}</span>
                           <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
                             <div className="bar-fill user-fill" style={{ width: `${Math.max((Number(entry.totalPoints || 0) / maxUserPoints) * 100, 8)}%`, background: '#f59e0b', height: '100%' }} />
                           </div>
-                          <strong>{entry.totalPoints} pts</strong>
+                          <strong style={{ color: '#0f172a' }}>{entry.totalPoints} pts</strong>
                         </div>
                       ))}
                     </div>
@@ -906,28 +919,28 @@ export default function App() {
               </section>
 
               {/* REPORT CON BOTONES DE ACCIÓN */}
-              <section className="admin-panel report-panel">
+              <section className="admin-panel report-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.25rem', border: '1px solid #e2e8f0' }}>
                 <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3>Wellness Challenge participants</h3>
+                  <h3 style={{ color: '#0f172a' }}>Wellness Challenge participants</h3>
                   <button type="button" className="small-button" onClick={() => window.open('/api/admin/report/csv', '_blank')}>Export CSV</button>
                 </div>
                 <div className="report-table-wrap" style={{ overflowX: 'auto', marginTop: '1rem' }}>
-                  <table className="report-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                  <table className="report-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', color: '#0f172a' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th><th>Actions</th></tr>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569' }}><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                       {adminReport.length === 0 ? (
-                        <tr><td colSpan="7" style={{ padding: '1rem', textAlign: 'center' }}>No participant activity yet.</td></tr>
+                        <tr><td colSpan="7" style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>No participant activity yet.</td></tr>
                       ) : (
                         adminReport.map((entry) => (
                           <tr key={entry.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                             {editingParticipantId === entry.id ? (
                               <>
-                                <td><input type="text" value={editingParticipantDraft.fullName} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, fullName: e.target.value })} /></td>
-                                <td><input type="email" value={editingParticipantDraft.email} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, email: e.target.value })} /></td>
+                                <td><input type="text" value={editingParticipantDraft.fullName} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, fullName: e.target.value })} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} /></td>
+                                <td><input type="email" value={editingParticipantDraft.email} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, email: e.target.value })} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} /></td>
                                 <td>
-                                  <select value={editingParticipantDraft.role} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, role: e.target.value })}>
+                                  <select value={editingParticipantDraft.role} onChange={(e) => setEditingParticipantDraft({ ...editingParticipantDraft, role: e.target.value })} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
                                     <option value="participant">Participant</option>
                                     <option value="admin">Admin</option>
                                   </select>
@@ -942,12 +955,12 @@ export default function App() {
                               </>
                             ) : (
                               <>
-                                <td style={{ padding: '0.5rem 0' }}>{entry.fullName}</td>
+                                <td style={{ padding: '0.75rem 0', fontWeight: 600 }}>{entry.fullName}</td>
                                 <td>{entry.email}</td>
-                                <td>{entry.role}</td>
+                                <td><span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: entry.role === 'admin' ? '#e0e7ff' : '#f1f5f9', color: entry.role === 'admin' ? '#3730a3' : '#475569', fontSize: '0.8rem', fontWeight: 600 }}>{entry.role}</span></td>
                                 <td>{entry.totalStamps}</td>
-                                <td>{entry.totalPoints}</td>
-                                <td>{entry.lastActivity}</td>
+                                <td><strong>{entry.totalPoints}</strong></td>
+                                <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{entry.lastActivity}</td>
                                 <td style={{ display: 'flex', gap: '0.5rem' }}>
                                   <button type="button" className="icon-button edit-button" onClick={() => handleEditUser(entry)} aria-label="Edit User"><Edit size={16} /></button>
                                   <button type="button" className="icon-button delete-button" onClick={() => handleDeleteUser(entry.id)} aria-label="Delete User"><Trash2 size={16} /></button>
@@ -964,22 +977,22 @@ export default function App() {
             </>
           )}
 
-          {/* SECCIÓN USER MANAGEMENT */}
+          {/* SECCIÓN USER MANAGEMENT - WHITE BACKGROUND & HIGH CONTRAST */}
           {adminTab === 'users' && (
-            <section className="admin-panel assignment-panel">
+            <section className="admin-panel assignment-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
               <div className="section-heading">
-                <h3>Registered Account Management</h3>
+                <h3 style={{ color: '#0f172a' }}>Registered Account Management</h3>
               </div>
-              <div className="participant-list" style={{ marginTop: '1rem' }}>
+              <div className="participant-list" style={{ marginTop: '1rem', background: '#ffffff' }}>
                 {participants.length === 0 ? (
                   <div className="empty-state">No registered accounts found.</div>
                 ) : (
                   participants.map((p) => (
-                    <div key={p.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                    <div key={p.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 0', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
                       <div>
-                        <strong>{p.fullName}</strong> <small>({p.role || 'participant'})</small>
+                        <strong style={{ color: '#0f172a', fontSize: '0.95rem' }}>{p.fullName}</strong> <small style={{ color: '#64748b' }}>({p.role || 'participant'})</small>
                         <br />
-                        <small style={{ color: '#64748b' }}>{p.email}</small>
+                        <span style={{ color: '#475569', fontSize: '0.85rem' }}>{p.email}</span>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {p.role !== 'admin' && (
@@ -997,12 +1010,12 @@ export default function App() {
 
           {/* SECCIÓN MANAGE WELLNESS CHALLENGE */}
           {adminTab === 'challenge' && (
-            <section className="admin-panel special-challenges-panel">
-              <div className="section-heading"><h3>Manage Wellness Challenge</h3></div>
+            <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Manage Wellness Challenge</h3></div>
               <div className="challenge-status-card">
                 <div className="challenge-status-copy">
                   <span className={`challenge-status-pill ${challengeStatus.isActive ? 'live' : 'paused'}`}>{challengeStatus.isActive ? 'Active Campaign' : 'Campaign Ended'}</span>
-                  <strong>{challengeStatus.title || 'No active campaign'}</strong>
+                  <strong style={{ color: '#0f172a' }}>{challengeStatus.title || 'No active campaign'}</strong>
                 </div>
                 <div className="admin-challenge-actions">
                   <button type="button" className="secondary-button" onClick={handleEndChallenge}>End Current Challenge Campaign</button>
@@ -1010,7 +1023,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="section-heading special-activities-heading"><h3>Add Special Activity</h3></div>
+              <div className="section-heading special-activities-heading" style={{ marginTop: '1.5rem' }}><h3 style={{ color: '#0f172a' }}>Add Special Activity</h3></div>
               <div className="special-challenges-layout">
                 <div className="special-challenges-form">
                   <label><span className="input-label">Activity Name</span><input type="text" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} placeholder="10K Steps Sprint" /></label>
@@ -1021,10 +1034,10 @@ export default function App() {
                 <div className="special-challenges-list">
                   {specialChallenges.length === 0 ? <div className="empty-state">No special activities configured yet.</div> : (
                     specialChallenges.map((ch) => (
-                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
                         <div>
-                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
-                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#0b41cd' }}>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#475569', fontSize: '0.85rem' }}>{ch.description}</p>
                           <small className="challenge-code">{ch.scanCode}</small>
                         </div>
                         <button type="button" className="icon-button delete-button" onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
@@ -1038,12 +1051,12 @@ export default function App() {
 
           {/* SECCIÓN MANAGE HIKING CLUB */}
           {adminTab === 'hiking' && (
-            <section className="admin-panel special-challenges-panel">
-              <div className="section-heading"><h3>Manage Hiking Club</h3></div>
+            <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Manage Hiking Club</h3></div>
               <div className="challenge-status-card">
                 <div className="challenge-status-copy">
                   <span className={`challenge-status-pill ${hikingStatus.isActive ? 'live' : 'paused'}`}>{hikingStatus.isActive ? 'Active Hiking Season' : 'Hiking Season Closed'}</span>
-                  <strong>{hikingStatus.title || 'No active hiking season'}</strong>
+                  <strong style={{ color: '#0f172a' }}>{hikingStatus.title || 'No active hiking season'}</strong>
                 </div>
                 <div className="admin-challenge-actions">
                   <button type="button" className="secondary-button" onClick={handleEndHikingSeason}>End Hiking Campaign</button>
@@ -1051,7 +1064,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="section-heading special-activities-heading"><h3>Add Hiking Activity</h3></div>
+              <div className="section-heading special-activities-heading" style={{ marginTop: '1.5rem' }}><h3 style={{ color: '#0f172a' }}>Add Hiking Activity</h3></div>
               <div className="special-challenges-layout">
                 <div className="special-challenges-form">
                   <label><span className="input-label">Hike Title</span><input type="text" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} placeholder="Summit Peak Hike" /></label>
@@ -1062,10 +1075,10 @@ export default function App() {
                 <div className="special-challenges-list">
                   {hikingChallenges.length === 0 ? <div className="empty-state">No hiking activities configured yet.</div> : (
                     hikingChallenges.map((ch) => (
-                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
                         <div>
-                          <strong>{ch.title}</strong> <small>{ch.points} pts</small>
-                          <p style={{ margin: '0.25rem 0 0 0' }}>{ch.description}</p>
+                          <strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#15803d' }}>{ch.points} pts</small>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#475569', fontSize: '0.85rem' }}>{ch.description}</p>
                           <small className="challenge-code">{ch.scanCode}</small>
                         </div>
                         <button type="button" className="icon-button delete-button" onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
@@ -1079,8 +1092,8 @@ export default function App() {
 
           {/* COMMUNITY MANAGEMENT */}
           {adminTab === 'community' && (
-            <section className="admin-panel community-admin-panel">
-              <div className="section-heading"><h3>Community management</h3></div>
+            <section className="admin-panel community-admin-panel" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Community management</h3></div>
               <div className="community-manager-grid">
                 <div className="community-manager-form">
                   <textarea value={adminCommunityDraft.message} onChange={(e) => setAdminCommunityDraft({ ...adminCommunityDraft, message: e.target.value })} placeholder="Publish an announcement..." />
@@ -1090,8 +1103,8 @@ export default function App() {
                   {adminCommunityPosts.length === 0 ? <div className="empty-state">No community posts yet.</div> : (
                     adminCommunityPosts.map((post) => (
                       <div key={post.id} className="admin-community-item">
-                        <div><strong>{post.author}</strong> <small>{post.isAnnouncement ? 'Announcement' : 'Community post'}</small></div>
-                        <p>{post.message}</p>
+                        <div><strong style={{ color: '#0f172a' }}>{post.author}</strong> <small>{post.isAnnouncement ? 'Announcement' : 'Community post'}</small></div>
+                        <p style={{ color: '#475569' }}>{post.message}</p>
                       </div>
                     ))
                   )}
@@ -1102,14 +1115,14 @@ export default function App() {
 
           {/* CATEGORY QR CODES */}
           {adminTab === 'qr' && (
-            <section className="admin-panel qr-panel qr-sheet">
-              <div className="section-heading qr-header"><h3>Category QR codes</h3></div>
+            <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+              <div className="section-heading qr-header"><h3 style={{ color: '#0f172a' }}>Category QR codes</h3></div>
               <div className="qr-grid qr-sheet-grid">
                 {adminQrCodes.length === 0 ? <div className="empty-state">Loading QR codes…</div> : (
                   adminQrCodes.map((item) => (
                     <div key={item.id} className="qr-card">
                       <img src={item.qrCode} alt={item.title} className="qr-image" />
-                      <strong>{item.title}</strong>
+                      <strong style={{ color: '#0f172a' }}>{item.title}</strong>
                       <small>{item.code}</small>
                     </div>
                   ))
@@ -1128,7 +1141,7 @@ export default function App() {
         <div className="portal-layout">
           <nav className="portal-nav">
             <div className="portal-brand"><IdCard className="button-icon" /></div>
-            <div className="portal-tabs">
+            <div className="portal-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', width: '100%' }}>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'passport' ? 'active' : ''}`} onClick={() => setActivePortalTab('passport')}>Digital Passport</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'community' ? 'active' : ''}`} onClick={() => setActivePortalTab('community')}>Wellness Community</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'challenge' ? 'active' : ''}`} onClick={() => setActivePortalTab('challenge')}>Special Activities</button>
@@ -1137,6 +1150,12 @@ export default function App() {
           </nav>
 
           <div className="portal-content">
+            {formError && (
+              <div className="auth-message error" style={{ marginBottom: '1rem', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.75rem', borderRadius: '8px' }}>
+                {formError}
+              </div>
+            )}
+
             {/* DIGITAL PASSPORT TAB */}
             {activePortalTab === 'passport' && (
               <>
@@ -1196,7 +1215,7 @@ export default function App() {
 
                         {method === 'scan' ? (
                           <div className="scan-box">
-                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                            <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}>
                               <ScanLine className="button-icon" /> Scan code with camera
                             </button>
                           </div>
@@ -1333,7 +1352,7 @@ export default function App() {
                     <div className="challenge-detail-card">
                       <p>{selectedChallenge.description}</p>
                       <div className="scan-box challenge-scan-box">
-                        <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(selectedChallenge.id)}>
+                        <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(selectedChallenge.id); }}>
                           <ScanLine className="button-icon" /> Scan activity QR
                         </button>
                         <div className="scan-meta">Reward: +{selectedChallenge.points} pts</div>
@@ -1417,7 +1436,7 @@ export default function App() {
 
                         {method === 'scan' ? (
                           <div className="scan-box">
-                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                            <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}>
                               <ScanLine className="button-icon" /> Scan hiking QR with camera
                             </button>
                           </div>
@@ -1499,6 +1518,7 @@ export default function App() {
             <button type="button" className="close-scanner" onClick={() => setScannerCategoryId(null)}>Close</button>
             <video ref={videoRef} className="scanner-video" autoPlay playsInline muted />
             <canvas ref={canvasRef} hidden />
+            {scannerError && <p className="auth-message error" style={{ margin: '0.5rem 0' }}>{scannerError}</p>}
           </div>
         </div>
       )}
