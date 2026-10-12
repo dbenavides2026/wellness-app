@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
-// Clear Service Workers and Cache Storage for mobile shortcuts
+// Unregister active Service Workers and clear stale Cache Storage for mobile shortcuts
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     for (const registration of registrations) {
