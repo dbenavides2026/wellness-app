@@ -15,8 +15,6 @@ const adminsDbPath = path.join(dataDir, 'admins.json');
 const communityDbPath = path.join(dataDir, 'community.json');
 const specialChallengesDbPath = path.join(dataDir, 'special-challenges.json');
 const challengeStatusPath = path.join(dataDir, 'challenge-status.json');
-const hikingChallengesDbPath = path.join(dataDir, 'hiking-challenges.json');
-const hikingStatusPath = path.join(dataDir, 'hiking-status.json');
 
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
@@ -59,39 +57,13 @@ if (!fs.existsSync(specialChallengesDbPath)) {
 
 const defaultChallengeStatus = {
   isActive: true,
-  title: 'Active Wellness Challenge Campaign',
+  title: 'Fresh challenge campaign started',
   startedAt: new Date().toISOString(),
   endedAt: ''
 };
 
 if (!fs.existsSync(challengeStatusPath)) {
   fs.writeFileSync(challengeStatusPath, JSON.stringify(defaultChallengeStatus, null, 2));
-}
-
-const defaultHikingChallenges = [
-  {
-    id: crypto.randomUUID(),
-    title: 'Summit Peak Hike',
-    description: 'Reach the summit peak and log your check-in code.',
-    points: 15,
-    scanCode: 'HIKING-SUMMIT-101',
-    proofPrompt: 'Upload a photo at the peak summit.'
-  }
-];
-
-if (!fs.existsSync(hikingChallengesDbPath)) {
-  fs.writeFileSync(hikingChallengesDbPath, JSON.stringify(defaultHikingChallenges, null, 2));
-}
-
-const defaultHikingStatus = {
-  isActive: true,
-  title: 'Active Hiking Season Campaign',
-  startedAt: new Date().toISOString(),
-  endedAt: ''
-};
-
-if (!fs.existsSync(hikingStatusPath)) {
-  fs.writeFileSync(hikingStatusPath, JSON.stringify(defaultHikingStatus, null, 2));
 }
 
 const app = express();
@@ -131,17 +103,12 @@ const writeSpecialChallenges = (challenges) => writeJson(specialChallengesDbPath
 const readChallengeStatus = () => readJson(challengeStatusPath, defaultChallengeStatus);
 const writeChallengeStatus = (status) => writeJson(challengeStatusPath, status);
 
-const readHikingChallenges = () => readJson(hikingChallengesDbPath, defaultHikingChallenges);
-const writeHikingChallenges = (challenges) => writeJson(hikingChallengesDbPath, challenges);
-const readHikingStatus = () => readJson(hikingStatusPath, defaultHikingStatus);
-const writeHikingStatus = (status) => writeJson(hikingStatusPath, status);
-
 const SUPERADMIN_EMAIL = 'superadmin@wellness.com';
 const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
 
 const sanitizeUser = (user) => {
   if (!user) return null;
-  const { password, ...rest } = user;
+  const { password, passwordPlain, ...rest } = user;
   return rest;
 };
 
@@ -156,8 +123,6 @@ const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const buildQrCatalog = async () => {
   try {
     const specialChallenges = readSpecialChallenges();
-    const hikingChallenges = readHikingChallenges();
-
     const challengeItems = await Promise.all(
       specialChallenges.map(async (ch) => ({
         id: ch.id,
@@ -170,18 +135,6 @@ const buildQrCatalog = async () => {
       }))
     );
 
-    const hikingItems = await Promise.all(
-      hikingChallenges.map(async (ch) => ({
-        id: ch.id,
-        title: `[Hiking] ${ch.title}`,
-        points: Number(ch.points || 15),
-        code: ch.scanCode,
-        scanCode: ch.scanCode,
-        isCategory: false,
-        qrCode: await QRCode.toDataURL(ch.scanCode, { margin: 1, width: 420, color: { dark: '#15803d', light: '#ffffff' } })
-      }))
-    );
-
     const categoryItems = await Promise.all(
       categoryQrConfigurations.map(async (cat) => ({
         ...cat,
@@ -189,7 +142,7 @@ const buildQrCatalog = async () => {
       }))
     );
 
-    return [...categoryItems, ...challengeItems, ...hikingItems];
+    return [...categoryItems, ...challengeItems];
   } catch (err) {
     console.error('QR Catalog Error:', err);
     return [];
@@ -241,7 +194,7 @@ app.post('/api/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = { id: crypto.randomUUID(), fullName, email, password: passwordHash, passwordPlain: password, stamps: [], role: 'participant', createdAt: new Date().toISOString() };
+    const user = { id: crypto.randomUUID(), fullName, email, password: passwordHash, passwordPlain: password, stamps: [] };
     participants.push(user);
     writeParticipants(participants);
 
@@ -262,54 +215,6 @@ app.post('/api/login', async (req, res) => {
     }
 
     return res.json({ user: sanitizeUser(user) });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.post('/api/forgot-password', async (req, res) => {
-  try {
-    const email = normalizeEmail(req.body.email);
-    if (!email) return res.status(400).json({ message: 'Please provide an email address.' });
-
-    const participants = readParticipants();
-    const match = participants.find((p) => normalizeEmail(p.email) === email);
-
-    if (!match) {
-      return res.status(404).json({ message: 'No registered user found with that email address.' });
-    }
-
-    const passwordRetrieved = match.passwordPlain || 'Saved password encrypted. Please reset through profile.';
-
-    return res.json({
-      message: `Password retrieved for ${match.email}`,
-      password: passwordRetrieved
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.put('/api/participants/:id/profile', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { fullName, email, password, profileImage } = req.body;
-    const participants = readParticipants();
-    const idx = participants.findIndex((p) => p.id === id);
-
-    if (idx === -1) return res.status(404).json({ message: 'User not found.' });
-
-    if (fullName) participants[idx].fullName = String(fullName).trim();
-    if (email) participants[idx].email = normalizeEmail(email);
-    if (profileImage !== undefined) participants[idx].profileImage = profileImage;
-
-    if (password && String(password).trim().length >= 6) {
-      participants[idx].password = await bcrypt.hash(String(password).trim(), 10);
-      participants[idx].passwordPlain = String(password).trim();
-    }
-
-    writeParticipants(participants);
-    return res.json({ user: sanitizeUser(participants[idx]), message: 'Profile updated successfully.' });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -379,66 +284,12 @@ app.get('/api/admin/stats', (_req, res) => {
   }
 });
 
-app.put('/api/admin/participants/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const { fullName, email, role } = req.body;
-    const participants = readParticipants();
-    const idx = participants.findIndex((p) => p.id === id);
-
-    if (idx === -1) return res.status(404).json({ message: 'User not found.' });
-
-    if (fullName) participants[idx].fullName = String(fullName).trim();
-    if (email) participants[idx].email = normalizeEmail(email);
-    if (role) participants[idx].role = role;
-
-    writeParticipants(participants);
-    return res.json({ user: sanitizeUser(participants[idx]), message: 'User updated successfully.' });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.delete('/api/admin/participants/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    let participants = readParticipants();
-    const exists = participants.some((p) => p.id === id);
-
-    if (!exists) return res.status(404).json({ message: 'User not found.' });
-
-    participants = participants.filter((p) => p.id !== id);
-    writeParticipants(participants);
-
-    return res.json({ message: 'User deleted successfully.' });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.post('/api/admin/participants/:id/promote', (req, res) => {
-  try {
-    const { id } = req.params;
-    const participants = readParticipants();
-    const idx = participants.findIndex((p) => p.id === id);
-
-    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
-
-    participants[idx].role = 'admin';
-    writeParticipants(participants);
-
-    return res.json({ user: sanitizeUser(participants[idx]), message: `${participants[idx].fullName} assigned as admin.` });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
 app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
 
 app.post('/api/admin/challenge-status/start', (req, res) => {
   try {
-    const status = { isActive: true, title: String(req.body.title || 'Active Wellness Challenge Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+    const status = { isActive: true, title: String(req.body.title || 'Fresh challenge campaign started').trim(), startedAt: new Date().toISOString(), endedAt: '' };
     writeChallengeStatus(status);
     return res.status(201).json({ status });
   } catch (err) {
@@ -448,10 +299,9 @@ app.post('/api/admin/challenge-status/start', (req, res) => {
 
 app.post('/api/admin/challenge-status/end', (_req, res) => {
   try {
-    const participants = readParticipants().map((p) => ({ ...p, stamps: [] }));
-    writeParticipants(participants);
-
-    const status = { isActive: false, title: 'Wellness Campaign Ended', startedAt: '', endedAt: new Date().toISOString() };
+    writeParticipants([]);
+    writeSpecialChallenges([]);
+    const status = { isActive: false, title: 'Campaign ended', startedAt: '', endedAt: new Date().toISOString() };
     writeChallengeStatus(status);
     return res.json({ status });
   } catch (err) {
@@ -500,70 +350,6 @@ app.delete('/api/admin/challenges/:id', (req, res) => {
   }
 });
 
-app.get('/api/hiking-challenges', (_req, res) => res.json({ challenges: readHikingChallenges() }));
-app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
-
-app.post('/api/admin/hiking-status/start', (req, res) => {
-  try {
-    const status = { isActive: true, title: String(req.body.title || 'Active Hiking Club Season').trim(), startedAt: new Date().toISOString(), endedAt: '' };
-    writeHikingStatus(status);
-    return res.status(201).json({ status });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.post('/api/admin/hiking-status/end', (_req, res) => {
-  try {
-    const status = { isActive: false, title: 'Hiking Season Ended', startedAt: '', endedAt: new Date().toISOString() };
-    writeHikingStatus(status);
-    return res.json({ status });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.post('/api/admin/hiking-challenges', (req, res) => {
-  try {
-    const title = String(req.body.title || '').trim();
-    const description = String(req.body.description || '').trim();
-    const points = Number(req.body.points || 15);
-    const scanCode = String(req.body.scanCode || `HIKING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
-    const proofPrompt = String(req.body.proofPrompt || 'Upload a photo from the hike.').trim();
-
-    if (!title || !description) {
-      return res.status(400).json({ message: 'Hiking title and description are required.' });
-    }
-
-    const challenges = readHikingChallenges();
-    const challenge = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      points: Number.isFinite(points) && points > 0 ? points : 15,
-      scanCode,
-      proofPrompt
-    };
-
-    challenges.unshift(challenge);
-    writeHikingChallenges(challenges);
-
-    return res.status(201).json({ challenge, challenges });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
-  try {
-    const challenges = readHikingChallenges().filter((c) => c.id !== req.params.id);
-    writeHikingChallenges(challenges);
-    return res.json({ deleted: true, count: challenges.length, challenges });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
 app.get('/api/admin/community', (_req, res) => {
   return res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) });
 });
@@ -604,29 +390,21 @@ app.post('/api/participants/:id/stamps', (req, res) => {
   try {
     const { id } = req.params;
     const { title, points, method, categoryId, scanCode } = req.body;
+    const status = readChallengeStatus();
 
-    const wellnessStatus = readChallengeStatus();
-    const hikingStatus = readHikingStatus();
-
-    const cleanCode = String(scanCode || '').trim().toUpperCase();
-    const isHikingCode = cleanCode.startsWith('HIKING-');
-
-    if (isHikingCode && (!hikingStatus || !hikingStatus.isActive)) {
-      return res.status(403).json({ message: 'Hiking activity logging is disabled because no active Hiking campaign is running.' });
-    }
-
-    if (!isHikingCode && (!wellnessStatus || !wellnessStatus.isActive)) {
-      return res.status(403).json({ message: 'Wellness activity logging is disabled because no active Wellness campaign is running.' });
+    if (!status || !status.isActive) {
+      return res.status(403).json({ message: 'Activity logging is disabled because no campaign is active.' });
     }
 
     const participants = readParticipants();
     const idx = participants.findIndex((p) => p.id === id);
     if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
 
+    const cleanCode = String(scanCode || '').trim().toUpperCase();
     let finalTitle = title;
     let finalPoints = Number(points || 1);
 
-    const catalog = [...categoryQrConfigurations, ...readSpecialChallenges(), ...readHikingChallenges()];
+    const catalog = [...categoryQrConfigurations, ...readSpecialChallenges()];
     const match = catalog.find((item) => item.code === cleanCode || item.scanCode === cleanCode);
     if (match) {
       finalTitle = match.title;
