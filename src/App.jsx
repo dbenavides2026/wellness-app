@@ -380,6 +380,88 @@ export default function App() {
     setCommunityDraft({ message: '', image: '' });
   };
 
+  const handleAdminCommunityPostSubmit = async () => {
+    const message = adminCommunityDraft.message.trim();
+    if (!message) {
+      setAdminMessage('Add a message to publish an announcement.');
+      return;
+    }
+
+    try {
+      await fetchJson('/api/admin/community', {
+        method: 'POST',
+        body: JSON.stringify({
+          author: 'Wellness Team',
+          role: adminUser?.role || 'admin',
+          message,
+          image: adminCommunityDraft.image,
+          isAnnouncement: adminCommunityDraft.isAnnouncement
+        })
+      });
+
+      setAdminCommunityDraft({ message: '', image: '', isAnnouncement: true });
+      setAdminMessage('Community update published successfully.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to save community update.');
+    }
+  };
+
+  const handleSaveSpecialChallenge = async () => {
+    const title = challengeForm.title.trim();
+    const description = challengeForm.description.trim();
+    if (!title || !description) {
+      setAdminMessage('Activity name and description are required.');
+      return;
+    }
+
+    try {
+      const method = editingChallengeId ? 'PUT' : 'POST';
+      const url = editingChallengeId ? `/api/admin/challenges/${editingChallengeId}` : '/api/admin/challenges';
+      await fetchJson(url, {
+        method,
+        body: JSON.stringify({
+          ...challengeForm,
+          points: Number(challengeForm.points) || 10,
+          proofPrompt: challengeForm.proofPrompt.trim() || 'Upload a photo proof.'
+        })
+      });
+
+      setChallengeForm({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
+      setEditingChallengeId(null);
+      setAdminMessage('Special activity saved successfully.');
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to save activity.');
+    }
+  };
+
+  const handleStartChallenge = async () => {
+    try {
+      const response = await fetchJson('/api/admin/challenge-status/start', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Fresh challenge campaign started' })
+      });
+      setChallengeStatus(response.status || challengeStatus);
+      setAdminMessage('New challenge campaign started.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to start campaign.');
+    }
+  };
+
+  const handleEndChallenge = async () => {
+    try {
+      const response = await fetchJson('/api/admin/challenge-status/end', { method: 'POST' });
+      setChallengeStatus(response.status || challengeStatus);
+      setAdminMessage('Current challenge campaign ended.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to end campaign.');
+    }
+  };
+
   const addStamp = async (activity) => {
     if (!currentUser) return;
     try {
@@ -490,6 +572,9 @@ export default function App() {
   }
 
   if (screen === 'admin-dashboard') {
+    const stats = adminStats?.stats || {};
+    const recentActivity = adminStats?.recentActivity || [];
+
     return (
       <div className="admin-app">
         <div className="admin-shell">
@@ -500,6 +585,7 @@ export default function App() {
             </div>
             <button type="button" className="logout-button" onClick={handleAdminLogout}><LogOut className="button-icon" /> Log out</button>
           </header>
+
           <nav className="admin-top-nav">
             <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Admin</button>
             <button type="button" className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Active challenge</button>
@@ -507,16 +593,120 @@ export default function App() {
             <button type="button" className={adminTab === 'qr' ? 'active' : ''} onClick={() => setAdminTab('qr')}>Category QR codes</button>
           </nav>
 
+          {adminMessage ? <p className="auth-message success" style={{ margin: '1rem 0' }}>{adminMessage}</p> : null}
+
+          {/* ADMIN OVERVIEW */}
+          {adminTab === 'admin' && (
+            <>
+              <section className="admin-metrics">
+                <article className="metric-card accent"><span>Total participants</span><strong>{stats.totalParticipants || 0}</strong></article>
+                <article className="metric-card"><span>Active participants</span><strong>{stats.activeParticipants || 0}</strong></article>
+                <article className="metric-card"><span>Total stamps</span><strong>{stats.totalStamps || 0}</strong></article>
+                <article className="metric-card"><span>Total points</span><strong>{stats.totalPoints || 0}</strong></article>
+              </section>
+
+              <section className="admin-panel report-panel">
+                <div className="section-heading">
+                  <h3>Participant report</h3>
+                  <button type="button" className="small-button" onClick={() => window.open('/api/admin/report/csv', '_blank')}>Export CSV</button>
+                </div>
+                <div className="report-table-wrap">
+                  <table className="report-table">
+                    <thead>
+                      <tr><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th></tr>
+                    </thead>
+                    <tbody>
+                      {adminReport.length === 0 ? (
+                        <tr><td colSpan="6">No participant activity yet.</td></tr>
+                      ) : (
+                        adminReport.map((entry) => (
+                          <tr key={entry.id}>
+                            <td>{entry.fullName}</td><td>{entry.email}</td><td>{entry.role}</td><td>{entry.totalStamps}</td><td>{entry.totalPoints}</td><td>{entry.lastActivity}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* MANAGE CHALLENGES & SPECIAL ACTIVITIES */}
+          {adminTab === 'challenge' && (
+            <section className="admin-panel special-challenges-panel">
+              <div className="section-heading"><h3>Manage Active challenge</h3></div>
+              <div className="challenge-status-card">
+                <div className="challenge-status-copy">
+                  <span className={`challenge-status-pill ${challengeStatus.isActive ? 'live' : 'paused'}`}>{challengeStatus.isActive ? 'Active challenge' : 'No active challenge'}</span>
+                  <strong>{challengeStatus.title || 'No active challenge'}</strong>
+                </div>
+                <div className="admin-challenge-actions">
+                  <button type="button" className="secondary-button" onClick={handleEndChallenge}>End Current Challenge Campaign</button>
+                  <button type="button" className="primary-button" onClick={handleStartChallenge}>Create New Challenge Campaign</button>
+                </div>
+              </div>
+
+              <div className="section-heading special-activities-heading"><h3>Add Special Activity</h3></div>
+              <div className="special-challenges-layout">
+                <div className="special-challenges-form">
+                  <label><span className="input-label">Activity Name</span><input type="text" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} placeholder="10K Steps Sprint" /></label>
+                  <label><span className="input-label">Description</span><textarea value={challengeForm.description} onChange={(e) => setChallengeForm({ ...challengeForm, description: e.target.value })} placeholder="Describe the challenge..." /></label>
+                  <label><span className="input-label">Points</span><input type="number" min="1" value={challengeForm.points} onChange={(e) => setChallengeForm({ ...challengeForm, points: e.target.value })} /></label>
+                  <button type="button" className="primary-button" onClick={handleSaveSpecialChallenge}>Add Special Activity</button>
+                </div>
+                <div className="special-challenges-list">
+                  {specialChallenges.length === 0 ? <div className="empty-state">No special activities configured yet.</div> : (
+                    specialChallenges.map((ch) => (
+                      <div key={ch.id} className="admin-community-item">
+                        <div><strong>{ch.title}</strong> <small>{ch.points} pts</small></div>
+                        <p>{ch.description}</p>
+                        <small className="challenge-code">{ch.scanCode}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* COMMUNITY MANAGEMENT */}
+          {adminTab === 'community' && (
+            <section className="admin-panel community-admin-panel">
+              <div className="section-heading"><h3>Community management</h3></div>
+              <div className="community-manager-grid">
+                <div className="community-manager-form">
+                  <textarea value={adminCommunityDraft.message} onChange={(e) => setAdminCommunityDraft({ ...adminCommunityDraft, message: e.target.value })} placeholder="Publish an announcement..." />
+                  <button type="button" className="primary-button" onClick={handleAdminCommunityPostSubmit}>Publish update</button>
+                </div>
+                <div className="community-manager-list">
+                  {adminCommunityPosts.length === 0 ? <div className="empty-state">No community posts yet.</div> : (
+                    adminCommunityPosts.map((post) => (
+                      <div key={post.id} className="admin-community-item">
+                        <div><strong>{post.author}</strong> <small>{post.isAnnouncement ? 'Announcement' : 'Community post'}</small></div>
+                        <p>{post.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* CATEGORY QR CODES */}
           {adminTab === 'qr' && (
             <section className="admin-panel qr-panel qr-sheet">
+              <div className="section-heading qr-header"><h3>Category QR codes</h3></div>
               <div className="qr-grid qr-sheet-grid">
-                {adminQrCodes.map((item) => (
-                  <div key={item.id} className="qr-card">
-                    <img src={item.qrCode} alt={item.title} className="qr-image" />
-                    <strong>{item.title}</strong>
-                    <small>{item.code}</small>
-                  </div>
-                ))}
+                {adminQrCodes.length === 0 ? <div className="empty-state">Loading QR codes…</div> : (
+                  adminQrCodes.map((item) => (
+                    <div key={item.id} className="qr-card">
+                      <img src={item.qrCode} alt={item.title} className="qr-image" />
+                      <strong>{item.title}</strong>
+                      <small>{item.code}</small>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           )}
