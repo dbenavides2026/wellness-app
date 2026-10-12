@@ -54,6 +54,17 @@ const categories = [
   }
 ];
 
+const hikingCategories = [
+  {
+    id: 'hiking-club-checkin',
+    title: 'Hiking Club Expedition',
+    points: 3,
+    iconType: 'mountain',
+    scanCode: 'HIKING-CLUB-101',
+    proofPrompt: 'Upload a photo from your trail or summit check-in.'
+  }
+];
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
     headers: {
@@ -321,6 +332,7 @@ export default function App() {
           setScannerError('');
 
           const targetCategory = categories.find((cat) => cat.id === scannerCategoryId)
+            || hikingCategories.find((hc) => hc.id === scannerCategoryId)
             || specialChallenges.find((sc) => sc.id === scannerCategoryId)
             || hikingChallenges.find((hc) => hc.id === scannerCategoryId)
             || { id: scannerCategoryId, title: 'QR Check-in', points: 1 };
@@ -629,7 +641,7 @@ export default function App() {
 
   const getStampBadge = (title) => {
     const normalized = String(title || '').toLowerCase();
-    if (normalized.includes('hiking') || normalized.includes('summit')) {
+    if (normalized.includes('hiking') || normalized.includes('summit') || normalized.includes('hike') || normalized.includes('trail')) {
       return { Icon: Mountain, background: 'rgba(21, 128, 61, 0.12)', color: '#15803d' };
     }
     if (normalized.includes('challenge') || normalized.includes('sprint') || normalized.includes('boost') || normalized.includes('outdoor') || normalized.includes('move')) {
@@ -920,7 +932,7 @@ export default function App() {
             </section>
           )}
 
-          {/* NUEVA SECCIÓN: MANAGE HIKING CLUB */}
+          {/* SECCIÓN MANAGE HIKING CLUB */}
           {adminTab === 'hiking' && (
             <section className="admin-panel special-challenges-panel">
               <div className="section-heading"><h3>Manage Hiking Club</h3></div>
@@ -1013,6 +1025,7 @@ export default function App() {
               <button type="button" className={`portal-nav-button ${activePortalTab === 'passport' ? 'active' : ''}`} onClick={() => setActivePortalTab('passport')}>Digital Passport</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'community' ? 'active' : ''}`} onClick={() => setActivePortalTab('community')}>Wellness Community</button>
               <button type="button" className={`portal-nav-button ${activePortalTab === 'challenge' ? 'active' : ''}`} onClick={() => setActivePortalTab('challenge')}>Special Activities</button>
+              <button type="button" className={`portal-nav-button ${activePortalTab === 'hiking' ? 'active' : ''}`} onClick={() => setActivePortalTab('hiking')}>Hiking Club</button>
             </div>
           </nav>
 
@@ -1185,12 +1198,12 @@ export default function App() {
 
                 {!selectedChallenge ? (
                   <div className="challenge-grid">
-                    {[...specialChallenges, ...hikingChallenges].length === 0 ? (
+                    {specialChallenges.length === 0 ? (
                       <div className="empty-state">No special activities available at the moment.</div>
                     ) : (
-                      [...specialChallenges, ...hikingChallenges].map((challenge) => (
+                      specialChallenges.map((challenge) => (
                         <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
-                          <span className="challenge-tag">{challenge.scanCode?.startsWith('HIKING') ? 'Hiking Club' : 'Special'}</span>
+                          <span className="challenge-tag">Special</span>
                           <h3>{challenge.title}</h3>
                           <p>{challenge.description}</p>
                           <strong>Reward: {challenge.points} pts</strong>
@@ -1241,13 +1254,102 @@ export default function App() {
                         type="button"
                         className="log-button"
                         onClick={() => addStamp(selectedChallenge)}
-                        disabled={selectedChallenge.scanCode?.startsWith('HIKING') ? !hikingStatus.isActive : !challengeStatus.isActive}
+                        disabled={!challengeStatus.isActive}
                       >
                         <PlusCircle className="button-icon" /> Log in Activity
                       </button>
                     </div>
                   </div>
                 )}
+              </section>
+            )}
+
+            {/* PESTAÑA DEDICADA HIKING CLUB */}
+            {activePortalTab === 'hiking' && (
+              <section className="challenge-panel">
+                <div className="section-heading">
+                  <h3>Hiking Club Expeditions</h3>
+                </div>
+
+                <main className="category-list" style={{ marginBottom: '2rem' }}>
+                  {hikingCategories.map((category) => {
+                    const method = categorySelections[category.id]?.method || 'scan';
+                    const scanValue = (scanEntries[category.id] || '').trim().toUpperCase();
+                    const isReady = method === 'scan' ? Boolean(scanValue) : Boolean(proofs[category.id]);
+                    const canLogActivity = hikingStatus.isActive && isReady;
+
+                    return (
+                      <article key={category.id} className="category-card">
+                        <div className="card-topline">
+                          <div className="category-title-wrap">
+                            <div className="icon-badge" style={{ background: 'rgba(21, 128, 61, 0.12)', color: '#15803d' }}>
+                              <Mountain className="category-icon" />
+                            </div>
+                            <div>
+                              <h2>{category.title}</h2>
+                              <p>+{category.points} points</p>
+                            </div>
+                          </div>
+                          <span className={`status-pill ${isReady ? 'success' : 'pending'}`}>
+                            {isReady ? <CheckCircle2 className="status-icon" /> : <Camera className="status-icon" />}
+                            {isReady ? 'Ready' : 'Proof required'}
+                          </span>
+                        </div>
+
+                        <div className="method-toggle">
+                          <button type="button" className={method === 'scan' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'scan' } }))}>
+                            <ScanLine className="button-icon" /> Scan code
+                          </button>
+                          <button type="button" className={method === 'upload' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }))}>
+                            <Upload className="button-icon" /> Upload proof
+                          </button>
+                        </div>
+
+                        {method === 'scan' ? (
+                          <div className="scan-box">
+                            <button type="button" className="scan-camera-button" onClick={() => setScannerCategoryId(category.id)}>
+                              <ScanLine className="button-icon" /> Scan hiking QR with camera
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="upload-box">
+                            <input type="file" accept="image/*" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setProofs((prev) => ({ ...prev, [category.id]: URL.createObjectURL(file) }));
+                                setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }));
+                              }
+                            }} />
+                            <span className="upload-hint">{category.proofPrompt}</span>
+                          </label>
+                        )}
+
+                        <button type="button" className="log-button" onClick={() => addStamp(category)} disabled={!canLogActivity}>
+                          <PlusCircle className="button-icon" /> Log Hiking Activity
+                        </button>
+                      </article>
+                    );
+                  })}
+                </main>
+
+                <div className="section-heading" style={{ marginTop: '1rem' }}>
+                  <h3>Scheduled Hikes & Trails</h3>
+                </div>
+
+                <div className="challenge-grid">
+                  {hikingChallenges.length === 0 ? (
+                    <div className="empty-state">No specific hike events configured yet.</div>
+                  ) : (
+                    hikingChallenges.map((challenge) => (
+                      <article key={challenge.id} className="challenge-card challenge-clickable" onClick={() => setSelectedChallenge(challenge)}>
+                        <span className="challenge-tag" style={{ background: '#15803d' }}>Hiking Club</span>
+                        <h3>{challenge.title}</h3>
+                        <p>{challenge.description}</p>
+                        <strong>Reward: {challenge.points} pts</strong>
+                      </article>
+                    ))
+                  )}
+                </div>
               </section>
             )}
 
