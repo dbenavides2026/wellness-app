@@ -30,7 +30,7 @@ const categories = [
     points: 1,
     iconType: 'dumbbell',
     scanCode: 'WELLNESS-GYM-101',
-    proofPrompt: 'Upload a photo of your workout setup or equipment log.',
+    proofPrompt: 'Upload a photo of your workout setup or equipment log.'
   },
   {
     id: 'group',
@@ -38,7 +38,7 @@ const categories = [
     points: 2,
     iconType: 'users',
     scanCode: 'WELLNESS-GROUP-202',
-    proofPrompt: 'Upload a photo of your class attendance or workout scene.',
+    proofPrompt: 'Upload a photo of your class attendance or workout scene.'
   },
   {
     id: 'sports',
@@ -46,17 +46,17 @@ const categories = [
     points: 2,
     iconType: 'trophy',
     scanCode: 'WELLNESS-SPORTS-303',
-    proofPrompt: 'Upload a photo of your activity, match, or hike.',
-  },
+    proofPrompt: 'Upload a photo of your activity, match, or hike.'
+  }
 ];
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...(options.headers || {})
     },
-    ...options,
+    ...options
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -72,11 +72,7 @@ export default function App() {
   const [adminQrCodes, setAdminQrCodes] = useState([]);
   const [adminReport, setAdminReport] = useState([]);
   const [adminCommunityPosts, setAdminCommunityPosts] = useState([]);
-  const [adminCommunityDraft, setAdminCommunityDraft] = useState({
-    message: '',
-    image: '',
-    isAnnouncement: true,
-  });
+  const [adminCommunityDraft, setAdminCommunityDraft] = useState({ message: '', image: '', isAnnouncement: true });
   const [communityPosts, setCommunityPosts] = useState([]);
   const [communityDraft, setCommunityDraft] = useState({ message: '', image: '' });
   const [screen, setScreen] = useState('login');
@@ -100,12 +96,7 @@ export default function App() {
   });
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
+  const [registerForm, setRegisterForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
   const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
   const [activePortalTab, setActivePortalTab] = useState('passport');
   const [selectedChallenge, setSelectedChallenge] = useState(null);
@@ -118,7 +109,7 @@ export default function App() {
     isActive: false,
     title: 'No active challenge',
     startedAt: '',
-    endedAt: '',
+    endedAt: ''
   });
 
   const [challengeForm, setChallengeForm] = useState({
@@ -126,7 +117,7 @@ export default function App() {
     description: '',
     points: 10,
     scanCode: '',
-    proofPrompt: '',
+    proofPrompt: ''
   });
 
   const [categorySelections, setCategorySelections] = useState({});
@@ -140,8 +131,7 @@ export default function App() {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
 
-  const points =
-    currentUser?.stamps?.reduce((total, stamp) => total + Number(stamp.points || 0), 0) || 0;
+  const points = currentUser?.stamps?.reduce((total, stamp) => total + Number(stamp.points || 0), 0) || 0;
 
   const refreshAllData = async () => {
     try {
@@ -150,7 +140,7 @@ export default function App() {
         fetchJson(`/api/participants?t=${t}`),
         fetchJson(`/api/admin/community?t=${t}`),
         fetchJson(`/api/challenges?t=${t}`),
-        fetchJson(`/api/admin/challenge-status?t=${t}`),
+        fetchJson(`/api/admin/challenge-status?t=${t}`)
       ]);
 
       const updatedParticipants = parts.participants || [];
@@ -177,7 +167,7 @@ export default function App() {
       const [stats, qrs, rep] = await Promise.all([
         fetchJson(`/api/admin/stats?t=${t}`),
         fetchJson(`/api/admin/qr-codes?t=${t}`),
-        fetchJson(`/api/admin/report?t=${t}`),
+        fetchJson(`/api/admin/report?t=${t}`)
       ]);
       setAdminStats(stats || { stats: {}, recentActivity: [] });
       setAdminQrCodes(qrs.qrCodes || []);
@@ -240,7 +230,6 @@ export default function App() {
     }
   }, [currentUser, adminUser, screen]);
 
-  // Strict QR validation on stamp submit
   const addStampWithCode = async (activity, directCode = '') => {
     if (!currentUser) return;
     const codeToSend = (directCode || scanEntries[activity.id] || '').trim().toUpperCase();
@@ -252,9 +241,7 @@ export default function App() {
     }
 
     if (expectedCode && codeToSend !== expectedCode) {
-      setFormError(
-        `Invalid QR code. Scanned "${codeToSend}", but "${activity.title}" requires "${expectedCode}".`
-      );
+      setFormError(`Invalid QR code. Scanned "${codeToSend}", but "${activity.title}" requires "${expectedCode}".`);
       return;
     }
 
@@ -265,23 +252,15 @@ export default function App() {
           title: activity.title,
           points: activity.points,
           categoryId: activity.id || 'general',
-          scanCode: codeToSend,
-        }),
+          scanCode: codeToSend
+        })
       });
 
       if (res.user) {
         setCurrentUser(res.user);
         setFormError('');
-        setProofs((p) => {
-          const n = { ...p };
-          delete n[activity.id];
-          return n;
-        });
-        setScanEntries((p) => {
-          const n = { ...p };
-          delete n[activity.id];
-          return n;
-        });
+        setProofs((p) => { const n = { ...p }; delete n[activity.id]; return n; });
+        setScanEntries((p) => { const n = { ...p }; delete n[activity.id]; return n; });
         confetti({ particleCount: 55, spread: 60, origin: { y: 0.8 } });
         await refreshAllData();
       }
@@ -294,11 +273,9 @@ export default function App() {
     addStampWithCode(activity, scanEntries[activity.id]);
   };
 
-  // Camera scanner loop with strict code matching
   useEffect(() => {
     if (!scannerCategoryId) return undefined;
-    let animId = 0,
-      cancelled = false;
+    let animId = 0, cancelled = false;
 
     const stopStream = () => {
       if (streamRef.current) {
@@ -322,14 +299,13 @@ export default function App() {
 
         if (decoded) {
           const val = decoded.data.trim().toUpperCase();
-          const targetCategory =
-            categories.find((cat) => cat.id === scannerCategoryId) ||
-            specialChallenges.find((sc) => sc.id === scannerCategoryId);
+          const targetCategory = categories.find((cat) => cat.id === scannerCategoryId)
+            || specialChallenges.find((sc) => sc.id === scannerCategoryId);
 
           const expected = (targetCategory?.scanCode || '').trim().toUpperCase();
 
           if (expected && val !== expected) {
-            setScannerError(`Invalid QR Code! Scanned code does not match "${targetCategory?.title}".`);
+            setScannerError(`Invalid QR Code! Code does not match "${targetCategory?.title}".`);
             if (!cancelled) animId = window.requestAnimationFrame(scanFrame);
             return;
           }
@@ -349,10 +325,7 @@ export default function App() {
 
     const startScanner = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -380,10 +353,7 @@ export default function App() {
     try {
       const res = await fetchJson('/api/login', {
         method: 'POST',
-        body: JSON.stringify({
-          email: loginForm.email.trim().toLowerCase(),
-          password: loginForm.password,
-        }),
+        body: JSON.stringify({ email: loginForm.email.trim().toLowerCase(), password: loginForm.password })
       });
       setCurrentUser(res.user);
       setAuthMessage('');
@@ -403,11 +373,7 @@ export default function App() {
     try {
       await fetchJson('/api/register', {
         method: 'POST',
-        body: JSON.stringify({
-          fullName: registerForm.fullName.trim(),
-          email: registerForm.email.trim().toLowerCase(),
-          password: registerForm.password,
-        }),
+        body: JSON.stringify({ fullName: registerForm.fullName.trim(), email: registerForm.email.trim().toLowerCase(), password: registerForm.password })
       });
       setScreen('login');
       setAuthMessage('Registration successful. Please log in.');
@@ -421,10 +387,7 @@ export default function App() {
     try {
       const res = await fetchJson('/api/admin/login', {
         method: 'POST',
-        body: JSON.stringify({
-          email: adminLoginForm.email.trim().toLowerCase(),
-          password: adminLoginForm.password,
-        }),
+        body: JSON.stringify({ email: adminLoginForm.email.trim().toLowerCase(), password: adminLoginForm.password })
       });
       setAdminUser(res.user);
       setAdminMessage('');
@@ -438,7 +401,7 @@ export default function App() {
     try {
       const response = await fetchJson(`/api/admin/participants/${participant.id}/promote`, {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify({})
       });
       setAdminMessage(response.message || `${participant.fullName} promoted to admin.`);
       await refreshAllData();
@@ -484,9 +447,9 @@ export default function App() {
         role,
         message,
         image: communityDraft.image,
-        createdAt: 'Just now',
+        createdAt: 'Just now'
       },
-      ...prev,
+      ...prev
     ]);
 
     setCommunityDraft({ message: '', image: '' });
@@ -507,8 +470,8 @@ export default function App() {
           role: adminUser?.role || 'admin',
           message,
           image: adminCommunityDraft.image,
-          isAnnouncement: adminCommunityDraft.isAnnouncement,
-        }),
+          isAnnouncement: adminCommunityDraft.isAnnouncement
+        })
       });
 
       setAdminCommunityDraft({ message: '', image: '', isAnnouncement: true });
@@ -533,8 +496,8 @@ export default function App() {
         body: JSON.stringify({
           ...challengeForm,
           points: Number(challengeForm.points) || 10,
-          proofPrompt: challengeForm.proofPrompt.trim() || 'Upload a photo proof.',
-        }),
+          proofPrompt: challengeForm.proofPrompt.trim() || 'Upload a photo proof.'
+        })
       });
 
       setChallengeForm({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
@@ -550,7 +513,7 @@ export default function App() {
     try {
       const response = await fetchJson('/api/admin/challenge-status/start', {
         method: 'POST',
-        body: JSON.stringify({ title: 'Fresh challenge campaign started' }),
+        body: JSON.stringify({ title: 'Fresh challenge campaign started' })
       });
       setChallengeStatus(response.status || challengeStatus);
       setAdminMessage('New challenge campaign started.');
@@ -573,13 +536,7 @@ export default function App() {
 
   const getStampBadge = (title) => {
     const normalized = String(title || '').toLowerCase();
-    if (
-      normalized.includes('challenge') ||
-      normalized.includes('sprint') ||
-      normalized.includes('boost') ||
-      normalized.includes('outdoor') ||
-      normalized.includes('move')
-    ) {
+    if (normalized.includes('challenge') || normalized.includes('sprint') || normalized.includes('boost') || normalized.includes('outdoor') || normalized.includes('move')) {
       return { Icon: Sparkles, background: 'rgba(245, 158, 11, 0.12)', color: '#b45309' };
     }
     if (normalized.includes('gym') || normalized.includes('workout')) {
