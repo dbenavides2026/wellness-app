@@ -80,9 +80,8 @@ export default function App() {
   const [adminCommunityDraft, setAdminCommunityDraft] = useState({ message: '', image: '', isAnnouncement: true });
   const [communityPosts, setCommunityPosts] = useState([]);
   const [communityDraft, setCommunityDraft] = useState({ message: '', image: '' });
-  const [accountDraft, setAccountDraft] = useState({ fullName: '', email: '', password: '', profileImage: '' });
-  const [accountMessage, setAccountMessage] = useState('');
   const [screen, setScreen] = useState('login');
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const raw = window.localStorage.getItem(CURRENT_USER_KEY);
@@ -91,6 +90,7 @@ export default function App() {
       return null;
     }
   });
+
   const [adminUser, setAdminUser] = useState(() => {
     try {
       const raw = window.localStorage.getItem(ADMIN_USER_KEY);
@@ -99,6 +99,7 @@ export default function App() {
       return null;
     }
   });
+
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
   const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
@@ -106,8 +107,6 @@ export default function App() {
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [adminTab, setAdminTab] = useState('admin');
   const [authMessage, setAuthMessage] = useState('');
-  const [passwordRecoveryEmail, setPasswordRecoveryEmail] = useState('');
-  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
   const [specialChallenges, setSpecialChallenges] = useState([]);
@@ -117,6 +116,7 @@ export default function App() {
     startedAt: '',
     endedAt: ''
   });
+
   const [challengeForm, setChallengeForm] = useState({
     title: '',
     description: '',
@@ -124,6 +124,7 @@ export default function App() {
     scanCode: '',
     proofPrompt: ''
   });
+
   const [editingChallengeId, setEditingChallengeId] = useState(null);
   const [categorySelections, setCategorySelections] = useState({});
   const [scanEntries, setScanEntries] = useState({});
@@ -137,15 +138,15 @@ export default function App() {
   const streamRef = useRef(null);
 
   const points = currentUser?.stamps?.reduce((total, stamp) => total + Number(stamp.points || 0), 0) || 0;
-  const noCampaignMessage = 'A new challenge campaign has not started yet. Activity logging is disabled until the wellness team creates and activates a campaign.';
 
   const refreshAllData = async () => {
     try {
+      const t = Date.now();
       const [parts, comms, chs, status] = await Promise.all([
-        fetchJson('/api/participants'),
-        fetchJson('/api/admin/community'),
-        fetchJson('/api/challenges'),
-        fetchJson('/api/admin/challenge-status')
+        fetchJson(`/api/participants?t=${t}`),
+        fetchJson(`/api/admin/community?t=${t}`),
+        fetchJson(`/api/challenges?t=${t}`),
+        fetchJson(`/api/admin/challenge-status?t=${t}`)
       ]);
 
       const updatedParticipants = parts.participants || [];
@@ -168,10 +169,11 @@ export default function App() {
 
   const refreshAdminData = async () => {
     try {
+      const t = Date.now();
       const [stats, qrs, rep] = await Promise.all([
-        fetchJson('/api/admin/stats'),
-        fetchJson('/api/admin/qr-codes'),
-        fetchJson('/api/admin/report')
+        fetchJson(`/api/admin/stats?t=${t}`),
+        fetchJson(`/api/admin/qr-codes?t=${t}`),
+        fetchJson(`/api/admin/report?t=${t}`)
       ]);
       setAdminStats(stats || { stats: {}, recentActivity: [] });
       setAdminQrCodes(qrs.qrCodes || []);
@@ -188,7 +190,21 @@ export default function App() {
       if (adminUser) refreshAdminData();
     }, 5000);
 
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAllData();
+        if (adminUser) refreshAdminData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, [currentUser?.id, adminUser?.id]);
 
   useEffect(() => {
@@ -198,12 +214,6 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       window.localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
-      setAccountDraft({
-        fullName: currentUser.fullName || '',
-        email: currentUser.email || '',
-        password: '',
-        profileImage: currentUser.profileImage || ''
-      });
     } else {
       window.localStorage.removeItem(CURRENT_USER_KEY);
     }
@@ -226,7 +236,6 @@ export default function App() {
     }
   }, [currentUser, adminUser, screen]);
 
-  // FUNCIÓN DE GUARDADO DIRECTO CON CÓDIGO
   const addStampWithCode = async (activity, directCode = '') => {
     if (!currentUser) return;
     const codeToSend = directCode || scanEntries[activity.id] || activity.scanCode || '';
@@ -259,7 +268,6 @@ export default function App() {
     addStampWithCode(activity, scanEntries[activity.id]);
   };
 
-  // ESCÁNER QR CON GUARDADO AUTOMÁTICO
   useEffect(() => {
     if (!scannerCategoryId) return undefined;
     let animId = 0, cancelled = false;
@@ -373,6 +381,26 @@ export default function App() {
       setScreen('admin-dashboard');
     } catch (err) {
       setAdminMessage(err.message);
+    }
+  };
+
+  const promoteParticipantToAdmin = async (participant) => {
+    if (!adminUser || (adminUser.role !== 'superadmin' && adminUser.role !== 'admin')) {
+      setAdminMessage('Only admins can assign administrative access.');
+      return;
+    }
+
+    try {
+      const response = await fetchJson(`/api/admin/participants/${participant.id}/promote`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+
+      setAdminMessage(response.message || `${participant.fullName} was promoted to admin.`);
+      await refreshAllData();
+      await refreshAdminData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to promote this participant to admin.');
     }
   };
 
@@ -590,6 +618,11 @@ export default function App() {
 
   if (screen === 'admin-dashboard') {
     const stats = adminStats?.stats || {};
+    const recentActivity = adminStats?.recentActivity || [];
+    const categoryEntries = Object.entries(stats.categoryBreakdown || {});
+    const topUsers = [...adminReport].sort((a, b) => Number(b.totalPoints) - Number(a.totalPoints)).slice(0, 10);
+    const maxCategoryCount = categoryEntries.length > 0 ? Math.max(...categoryEntries.map(([, count]) => Number(count || 0))) : 1;
+    const maxUserPoints = topUsers.length > 0 ? Math.max(...topUsers.map((u) => Number(u.totalPoints || 0))) : 1;
 
     return (
       <div className="admin-app">
@@ -611,9 +644,43 @@ export default function App() {
 
           {adminMessage ? <p className="auth-message success" style={{ margin: '1rem 0' }}>{adminMessage}</p> : null}
 
-          {/* ADMIN OVERVIEW */}
+          {/* TAB ADMIN: ASIGNAR ROLES, MÉTRICAS Y GRÁFICOS */}
           {adminTab === 'admin' && (
             <>
+              {/* PANEL DE ASIGNACIÓN DE ADMIN */}
+              <section className="admin-panel assignment-panel" style={{ marginBottom: '1.5rem' }}>
+                <div className="section-heading">
+                  <h3>Assign admin role</h3>
+                </div>
+                <div className="participant-list">
+                  {participants.length === 0 ? (
+                    <div className="empty-state">No registered participants yet.</div>
+                  ) : (
+                    participants.map((participant) => {
+                      const alreadyAdmin = participant.role === 'admin' || (adminUser?.email && participant.email === adminUser.email);
+                      return (
+                        <div key={participant.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                          <div>
+                            <strong>{participant.fullName}</strong>
+                            <br />
+                            <small style={{ color: '#64748b' }}>{participant.email}</small>
+                          </div>
+                          <button
+                            type="button"
+                            className="small-button"
+                            disabled={alreadyAdmin}
+                            onClick={() => promoteParticipantToAdmin(participant)}
+                          >
+                            {alreadyAdmin ? 'Admin assigned' : 'Assign admin'}
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+
+              {/* METRICAS PRINCIPALES */}
               <section className="admin-metrics">
                 <article className="metric-card accent"><span>Total participants</span><strong>{stats.totalParticipants || 0}</strong></article>
                 <article className="metric-card"><span>Active participants</span><strong>{stats.activeParticipants || 0}</strong></article>
@@ -621,23 +688,73 @@ export default function App() {
                 <article className="metric-card"><span>Total points</span><strong>{stats.totalPoints || 0}</strong></article>
               </section>
 
+              {/* GRÁFICOS DE BARRAS */}
+              <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', margin: '1.5rem 0' }}>
+                <div className="admin-panel chart-panel">
+                  <h3>Category activity</h3>
+                  {categoryEntries.length === 0 ? (
+                    <div className="empty-state">No category activity yet.</div>
+                  ) : (
+                    <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+                      {categoryEntries.map(([key, count]) => (
+                        <div key={key} className="bar-row">
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{key}</span>
+                          <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
+                            <div className="bar-fill" style={{ width: `${(Number(count || 0) / maxCategoryCount) * 100}%`, background: '#0b41cd', height: '100%' }} />
+                          </div>
+                          <strong>{count}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="admin-panel chart-panel">
+                  <h3>Top 10 users by total points</h3>
+                  {topUsers.length === 0 ? (
+                    <div className="empty-state">No point totals yet.</div>
+                  ) : (
+                    <div className="bar-chart user-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+                      {topUsers.map((entry) => (
+                        <div key={entry.id} className="bar-row">
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{entry.fullName}</span>
+                          <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
+                            <div
+                              className="bar-fill user-fill"
+                              style={{ width: `${Math.max((Number(entry.totalPoints || 0) / maxUserPoints) * 100, 8)}%`, background: '#f59e0b', height: '100%' }}
+                            />
+                          </div>
+                          <strong>{entry.totalPoints} pts</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* REPORTES Y CSV */}
               <section className="admin-panel report-panel">
-                <div className="section-heading">
+                <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3>Participant report</h3>
                   <button type="button" className="small-button" onClick={() => window.open('/api/admin/report/csv', '_blank')}>Export CSV</button>
                 </div>
-                <div className="report-table-wrap">
-                  <table className="report-table">
+                <div className="report-table-wrap" style={{ overflowX: 'auto', marginTop: '1rem' }}>
+                  <table className="report-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th></tr>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}><th>Name</th><th>Email</th><th>Role</th><th>Stamps</th><th>Points</th><th>Last activity</th></tr>
                     </thead>
                     <tbody>
                       {adminReport.length === 0 ? (
-                        <tr><td colSpan="6">No participant activity yet.</td></tr>
+                        <tr><td colSpan="6" style={{ padding: '1rem', textAlign: 'center' }}>No participant activity yet.</td></tr>
                       ) : (
                         adminReport.map((entry) => (
-                          <tr key={entry.id}>
-                            <td>{entry.fullName}</td><td>{entry.email}</td><td>{entry.role}</td><td>{entry.totalStamps}</td><td>{entry.totalPoints}</td><td>{entry.lastActivity}</td>
+                          <tr key={entry.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.5rem 0' }}>{entry.fullName}</td>
+                            <td>{entry.email}</td>
+                            <td>{entry.role}</td>
+                            <td>{entry.totalStamps}</td>
+                            <td>{entry.totalPoints}</td>
+                            <td>{entry.lastActivity}</td>
                           </tr>
                         ))
                       )}
