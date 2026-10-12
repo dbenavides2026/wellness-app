@@ -175,6 +175,7 @@ const ensureSuperAdmin = async () => {
   writeAdmins(admins);
 };
 
+// Endpoints API
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'wellness-passport-api' }));
 app.get('/api/participants', (_req, res) => res.json({ participants: readParticipants().map(sanitizeUser) }));
 
@@ -473,10 +474,17 @@ app.get('/api/admin/report/csv', (_req, res) => {
   }
 });
 
+// Servidor de archivos estáticos para React
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get('/{*splat}', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  // Sintaxis universal compatible con Express 4 y Express 5
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+    next();
+  });
 }
 
 const startServer = async () => {
