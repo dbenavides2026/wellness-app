@@ -32,7 +32,7 @@ if (!fs.existsSync(communityDbPath)) {
   fs.writeFileSync(communityDbPath, JSON.stringify([
     {
       id: crypto.randomUUID(),
-      author: 'Roche Wellness Team',
+      author: 'Wellness Team',
       role: 'admin',
       message: 'Welcome to the Wellness Community — share wins, workouts, and encouragement with the team.',
       image: '',
@@ -48,7 +48,7 @@ const defaultSpecialChallenges = [
     title: '10K Steps Sprint',
     description: 'Complete 10,000 steps across the week and log your movement with proof.',
     points: 10,
-    scanCode: 'ROCHE-CHALLENGE-STEPS',
+    scanCode: 'WELLNESS-CHALLENGE-STEPS',
     proofPrompt: 'Upload a photo showing your steps challenge progress or movement moment.'
   },
   {
@@ -56,7 +56,7 @@ const defaultSpecialChallenges = [
     title: 'Team Energy Boost',
     description: 'Join a team wellness activity and share a photo check-in from the session.',
     points: 10,
-    scanCode: 'ROCHE-CHALLENGE-TEAM',
+    scanCode: 'WELLNESS-CHALLENGE-TEAM',
     proofPrompt: 'Upload a photo of your team workout, class, or group challenge moment.'
   },
   {
@@ -64,7 +64,7 @@ const defaultSpecialChallenges = [
     title: 'Outdoor Move',
     description: 'Take part in an outdoor or sport challenge and submit proof of your activity.',
     points: 10,
-    scanCode: 'ROCHE-CHALLENGE-OUTDOOR',
+    scanCode: 'WELLNESS-CHALLENGE-OUTDOOR',
     proofPrompt: 'Upload a photo of your outdoor session, sport, or active challenge.'
   }
 ];
@@ -85,7 +85,6 @@ if (!fs.existsSync(challengeStatusPath)) {
 }
 
 const app = express();
-// Ajuste para el puerto dinámico asignado por Render
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: true, credentials: true }));
@@ -115,7 +114,7 @@ const writeSpecialChallenges = (challenges) => writeJson(specialChallengesDbPath
 const readChallengeStatus = () => readJson(challengeStatusPath, defaultChallengeStatus);
 const writeChallengeStatus = (status) => writeJson(challengeStatusPath, status);
 
-const SUPERADMIN_EMAIL = 'superadmin@roche.com';
+const SUPERADMIN_EMAIL = 'superadmin@wellness.com';
 const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
 
 const sanitizeUser = (user) => {
@@ -127,26 +126,29 @@ const sanitizeUser = (user) => {
 const categoryQrConfigurations = [
   {
     id: 'gym',
+    categoryId: 'gym',
     title: 'Gym / Solo Workout',
     points: 1,
-    code: 'ROCHE-GYM-101',
-    scanCode: 'ROCHE-GYM-101',
+    code: 'WELLNESS-GYM-101',
+    scanCode: 'WELLNESS-GYM-101',
     isCategory: true
   },
   {
     id: 'group',
+    categoryId: 'group',
     title: 'Group Fitness Class',
     points: 2,
-    code: 'ROCHE-GROUP-202',
-    scanCode: 'ROCHE-GROUP-202',
+    code: 'WELLNESS-GROUP-202',
+    scanCode: 'WELLNESS-GROUP-202',
     isCategory: true
   },
   {
     id: 'sports',
+    categoryId: 'sports',
     title: 'Sports & Outdoor Game',
     points: 2,
-    code: 'ROCHE-SPORTS-303',
-    scanCode: 'ROCHE-SPORTS-303',
+    code: 'WELLNESS-SPORTS-303',
+    scanCode: 'WELLNESS-SPORTS-303',
     isCategory: true
   }
 ];
@@ -237,10 +239,6 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ message: 'Please complete all registration fields.' });
     }
 
-    if (!email.endsWith('@roche.com')) {
-      return res.status(400).json({ message: 'Use a valid Roche email ending in @roche.com.' });
-    }
-
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
     }
@@ -249,7 +247,7 @@ app.post('/api/register', async (req, res) => {
     const emailExists = participants.some((person) => normalizeEmail(person.email) === email);
 
     if (emailExists) {
-      return res.status(409).json({ message: 'That Roche email is already registered.' });
+      return res.status(409).json({ message: 'That email is already registered.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -277,20 +275,20 @@ app.post('/api/login', async (req, res) => {
     const password = String(req.body.password || '');
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Enter both a Roche email and password.' });
+      return res.status(400).json({ message: 'Enter both email and password.' });
     }
 
     const participants = readParticipants();
     const match = participants.find((person) => normalizeEmail(person.email) === email);
 
     if (!match) {
-      return res.status(401).json({ message: 'No participant matched that Roche email and password.' });
+      return res.status(401).json({ message: 'No participant matched that email and password.' });
     }
 
     const validPassword = await bcrypt.compare(password, match.password);
 
     if (!validPassword) {
-      return res.status(401).json({ message: 'No participant matched that Roche email and password.' });
+      return res.status(401).json({ message: 'No participant matched that email and password.' });
     }
 
     if (!match.passwordPlain) {
@@ -309,18 +307,18 @@ app.post('/api/forgot-password', async (req, res) => {
     const email = normalizeEmail(req.body.email);
 
     if (!email) {
-      return res.status(400).json({ message: 'Enter a Roche email to retrieve your current password.' });
+      return res.status(400).json({ message: 'Enter an email to retrieve your current password.' });
     }
 
     const participants = readParticipants();
     const match = participants.find((person) => normalizeEmail(person.email) === email);
 
     if (!match) {
-      return res.status(404).json({ message: 'No participant account was found for that Roche email.' });
+      return res.status(404).json({ message: 'No participant account was found for that email.' });
     }
 
     if (!match.passwordPlain) {
-      return res.status(400).json({ message: 'This password cannot be shown because it was set before the password recall feature was enabled.' });
+      return res.status(400).json({ message: 'This password cannot be shown because it was set before password recall was enabled.' });
     }
 
     return res.json({ email: match.email, password: match.passwordPlain });
@@ -341,76 +339,16 @@ app.post('/api/admin/forgot-password', async (req, res) => {
     const match = admins.find((admin) => normalizeEmail(admin.email) === email);
 
     if (!match) {
-      return res.status(404).json({ message: 'No admin account was found for that Roche email.' });
+      return res.status(404).json({ message: 'No admin account was found for that email.' });
     }
 
     if (!match.passwordPlain) {
-      return res.status(400).json({ message: 'This password cannot be shown because it was set before the password recall feature was enabled.' });
+      return res.status(400).json({ message: 'This password cannot be shown because it was set before password recall was enabled.' });
     }
 
     return res.json({ email: match.email, password: match.passwordPlain });
   } catch (error) {
     return res.status(500).json({ message: 'Unable to retrieve the current admin password.', error: error.message });
-  }
-});
-
-app.post('/api/admin/register', async (req, res) => {
-  try {
-    await ensureSuperAdmin();
-
-    const fullName = String(req.body.fullName || '').trim();
-    const email = normalizeEmail(req.body.email);
-    const password = String(req.body.password || '');
-    const superAdminPassword = String(req.body.superAdminPassword || '');
-
-    if (!fullName || !email || !password) {
-      return res.status(400).json({ message: 'Please complete all admin fields.' });
-    }
-
-    if (!email.endsWith('@roche.com')) {
-      return res.status(400).json({ message: 'Use a valid Roche email ending in @roche.com.' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
-    }
-
-    const admins = readAdmins();
-    const superAdmin = admins.find((admin) => admin.role === 'superadmin');
-
-    if (!superAdmin || !superAdminPassword) {
-      return res.status(403).json({ message: 'Only the superadmin can create admin accounts.' });
-    }
-
-    const validSuperAdmin = await bcrypt.compare(superAdminPassword, superAdmin.password);
-
-    if (!validSuperAdmin) {
-      return res.status(403).json({ message: 'Only the superadmin can create admin accounts.' });
-    }
-
-    const emailExists = admins.some((admin) => normalizeEmail(admin.email) === email);
-
-    if (emailExists) {
-      return res.status(409).json({ message: 'An admin with that Roche email already exists.' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const admin = {
-      id: crypto.randomUUID(),
-      fullName,
-      email,
-      password: passwordHash,
-      passwordPlain: password,
-      role: 'admin',
-      createdAt: new Date().toISOString()
-    };
-
-    admins.push(admin);
-    writeAdmins(admins);
-
-    return res.status(201).json({ user: sanitizeUser(admin) });
-  } catch (error) {
-    return res.status(500).json({ message: 'Unable to create the admin account.', error: error.message });
   }
 });
 
@@ -429,13 +367,13 @@ app.post('/api/admin/login', async (req, res) => {
     const match = admins.find((admin) => normalizeEmail(admin.email) === email);
 
     if (!match) {
-      return res.status(401).json({ message: 'No admin matched that Roche email and password.' });
+      return res.status(401).json({ message: 'No admin matched that email and password.' });
     }
 
     const validPassword = await bcrypt.compare(password, match.password);
 
     if (!validPassword) {
-      return res.status(401).json({ message: 'No admin matched that Roche email and password.' });
+      return res.status(401).json({ message: 'No admin matched that email and password.' });
     }
 
     if (!match.passwordPlain) {
@@ -572,11 +510,7 @@ app.put('/api/admin/participants/:id', async (req, res) => {
     const role = String(req.body.role || 'participant').toLowerCase() === 'admin' ? 'admin' : 'participant';
 
     if (!fullName || !email) {
-      return res.status(400).json({ message: 'Full name and Roche email are required.' });
-    }
-
-    if (!email.endsWith('@roche.com')) {
-      return res.status(400).json({ message: 'Use a valid Roche email ending in @roche.com.' });
+      return res.status(400).json({ message: 'Full name and email are required.' });
     }
 
     const participants = readParticipants();
@@ -591,10 +525,6 @@ app.put('/api/admin/participants/:id', async (req, res) => {
     participant.fullName = fullName;
     participant.email = email;
     participant.role = role;
-
-    if (participant.passwordPlain) {
-      participant.passwordPlain = participant.passwordPlain;
-    }
 
     writeParticipants(participants);
 
@@ -760,13 +690,14 @@ app.post('/api/admin/challenge-status/end', (_req, res) => {
   }
 });
 
+// ADD SPECIAL ACTIVITY
 app.post('/api/admin/challenges', (req, res) => {
   try {
-    const title = String(req.body.title || '').trim();
+    const title = String(req.body.title || req.body.name || '').trim();
     const description = String(req.body.description || '').trim();
     const points = Number(req.body.points || 10);
     const providedScanCode = String(req.body.scanCode || '').trim().toUpperCase();
-    const scanCode = providedScanCode || `ROCHE-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const scanCode = providedScanCode || `WELLNESS-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const proofPrompt = String(req.body.proofPrompt || '').trim();
 
     if (!title || !description) {
@@ -795,11 +726,10 @@ app.post('/api/admin/challenges', (req, res) => {
 app.put('/api/admin/challenges/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const title = String(req.body.title || '').trim();
+    const title = String(req.body.title || req.body.name || '').trim();
     const description = String(req.body.description || '').trim();
     const points = Number(req.body.points || 10);
     const providedScanCode = String(req.body.scanCode || '').trim().toUpperCase();
-    const scanCode = providedScanCode || `ROCHE-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const proofPrompt = String(req.body.proofPrompt || '').trim();
 
     const challenges = readSpecialChallenges();
@@ -814,7 +744,7 @@ app.put('/api/admin/challenges/:id', (req, res) => {
       title: title || challenges[index].title,
       description: description || challenges[index].description,
       points: Number.isFinite(points) && points > 0 ? points : challenges[index].points,
-      scanCode: scanCode || challenges[index].scanCode,
+      scanCode: providedScanCode || challenges[index].scanCode,
       proofPrompt: proofPrompt || challenges[index].proofPrompt || 'Upload a photo of your challenge progress.'
     };
 
@@ -857,7 +787,7 @@ app.post('/api/admin/community', (req, res) => {
     const role = String(req.body.role || 'admin').trim() || 'admin';
     const image = String(req.body.image || '').trim();
     const isAnnouncement = Boolean(req.body.isAnnouncement);
-    const author = isAnnouncement || role === 'admin' ? 'Roche Wellness Team' : String(req.body.author || 'Roche Wellness Team').trim() || 'Roche Wellness Team';
+    const author = isAnnouncement || role === 'admin' ? 'Wellness Team' : String(req.body.author || 'Wellness Team').trim() || 'Wellness Team';
 
     if (!message && !image) {
       return res.status(400).json({ message: 'Community announcement requires text or an image.' });
@@ -956,13 +886,12 @@ app.post('/api/participants/:id/reset', (req, res) => {
   }
 });
 
-// --- SERVIR FRONTEND ESTÁTICO DE REACT (COMPATIBLE CON EXPRESS 5) ---
+// SERVIR FRONTEND ESTÁTICO EN EXPRESS 5
 const distPath = path.join(__dirname, '..', 'dist');
 
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  
-  // Expresión regular compatible con Express 5 para capturar cualquier ruta
+
   app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
