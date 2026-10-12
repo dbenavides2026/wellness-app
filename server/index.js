@@ -267,7 +267,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// FORGOT PASSWORD ENDPOINT (Cross-references database)
 app.post('/api/forgot-password', async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
@@ -291,7 +290,6 @@ app.post('/api/forgot-password', async (req, res) => {
   }
 });
 
-// UPDATE USER PROFILE
 app.put('/api/participants/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
