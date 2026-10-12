@@ -22,11 +22,17 @@ if (!fs.existsSync(adminsDbPath)) fs.writeFileSync(adminsDbPath, JSON.stringify(
 if (!fs.existsSync(communityDbPath)) fs.writeFileSync(communityDbPath, JSON.stringify([{ id: crypto.randomUUID(), author: 'Roche Wellness Team', role: 'admin', message: 'Welcome to the Wellness Community!', isAnnouncement: true, createdAt: new Date().toISOString() }], null, 2));
 
 const defaultChallenges = [
-  { id: crypto.randomUUID(), title: '10K Steps Sprint', description: 'Complete 10,000 steps.', points: 10, scanCode: 'ROCHE-STEPS', proofPrompt: 'Upload photo.' },
-  { id: crypto.randomUUID(), title: 'Team Energy Boost', description: 'Join group activity.', points: 10, scanCode: 'ROCHE-TEAM', proofPrompt: 'Upload photo.' }
+  { id: crypto.randomUUID(), title: '10K Steps Sprint', description: 'Complete 10,000 steps.', points: 10, scanCode: 'ROCHE-CHALLENGE-STEPS', proofPrompt: 'Upload photo.' },
+  { id: crypto.randomUUID(), title: 'Team Energy Boost', description: 'Join group activity.', points: 10, scanCode: 'ROCHE-CHALLENGE-TEAM', proofPrompt: 'Upload photo.' },
+  { id: crypto.randomUUID(), title: 'Outdoor Move', description: 'Outdoor activity.', points: 10, scanCode: 'ROCHE-CHALLENGE-OUTDOOR', proofPrompt: 'Upload photo.' }
 ];
 if (!fs.existsSync(specialChallengesDbPath)) fs.writeFileSync(specialChallengesDbPath, JSON.stringify(defaultChallenges, null, 2));
-if (!fs.existsSync(challengeStatusPath)) fs.writeFileSync(challengeStatusPath, JSON.stringify({ isActive: true, title: 'Active Campaign' }, null, 2));
+
+// Asegurar que la campaña inicie ACTIVA por defecto
+const defaultStatus = { isActive: true, title: 'Active Challenge Campaign', startedAt: new Date().toISOString(), endedAt: '' };
+if (!fs.existsSync(challengeStatusPath)) {
+  fs.writeFileSync(challengeStatusPath, JSON.stringify(defaultStatus, null, 2));
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,7 +49,7 @@ const readAdmins = () => readJson(adminsDbPath, []);
 const writeAdmins = (a) => writeJson(adminsDbPath, a);
 const readCommunityPosts = () => readJson(communityDbPath, []);
 const readSpecialChallenges = () => readJson(specialChallengesDbPath, defaultChallenges);
-const readChallengeStatus = () => readJson(challengeStatusPath, { isActive: true });
+const readChallengeStatus = () => readJson(challengeStatusPath, defaultStatus);
 
 const SUPERADMIN_EMAIL = 'superadmin@roche.com';
 const SUPERADMIN_PASSWORD = 'DigitalPassport*2026';
@@ -63,7 +69,7 @@ const ensureSuperAdmin = async () => {
   writeAdmins(admins);
 };
 
-// --- ENDPOINTS DE LA API ---
+// --- ENDPOINTS API ---
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'wellness-passport-api' }));
 app.get('/api/participants', (_req, res) => res.json({ participants: readParticipants().map(sanitizeUser) }));
 
@@ -104,6 +110,32 @@ app.post('/api/admin/login', async (req, res) => {
     const admin = readAdmins().find((a) => normalizeEmail(a.email) === email);
     if (!admin || !(await bcrypt.compare(password, admin.password))) return res.status(401).json({ message: 'Invalid admin credentials.' });
     return res.json({ user: sanitizeUser(admin) });
+  } catch (err) { return res.status(500).json({ message: err.message }); }
+});
+
+// Endpoint para REGISTRAR ACTIVIDAD (Sello/Stamp desde QR)
+app.post('/api/participants/:id/stamps', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, points, method, categoryId, date, scanCode } = req.body;
+
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === id);
+    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
+
+    const stamp = {
+      id: crypto.randomUUID(),
+      title: title || 'Activity logged',
+      points: Number(points || 1),
+      method: method || 'qr',
+      categoryId: categoryId || 'general',
+      scanCode: String(scanCode || '').trim().toUpperCase(),
+      date: date || new Date().toISOString()
+    };
+
+    participants[idx].stamps = [stamp, ...(participants[idx].stamps || [])];
+    writeParticipants(participants);
+    return res.json({ user: sanitizeUser(participants[idx]) });
   } catch (err) { return res.status(500).json({ message: err.message }); }
 });
 
