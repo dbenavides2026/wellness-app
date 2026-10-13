@@ -1,4 +1,4 @@
-\import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
@@ -26,16 +26,20 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
 if (!fs.existsSync(adminsDbPath)) fs.writeFileSync(adminsDbPath, JSON.stringify([], null, 2));
 
-if (!fs.existsSync(communityDbPath)) {
-  fs.writeFileSync(communityDbPath, JSON.stringify([{
+const initialCommunityPosts = [
+  {
     id: crypto.randomUUID(),
     author: 'Wellness Team',
     role: 'admin',
-    message: 'Welcome to the Wellness Community — share wins, workouts, and encouragement with the team.',
+    message: 'Welcome to the Wellness Community! Share your fitness wins, workout photos, and track your progress across all activities.',
     image: '',
     isAnnouncement: true,
     createdAt: new Date().toISOString()
-  }], null, 2));
+  }
+];
+
+if (!fs.existsSync(communityDbPath) || JSON.parse(fs.readFileSync(communityDbPath, 'utf8') || '[]').length === 0) {
+  fs.writeFileSync(communityDbPath, JSON.stringify(initialCommunityPosts, null, 2));
 }
 
 const defaultSpecialChallenges = [
@@ -102,7 +106,7 @@ const readParticipants = () => readJson(dbPath, []);
 const writeParticipants = (p) => writeJson(dbPath, p);
 const readAdmins = () => readJson(adminsDbPath, []);
 const writeAdmins = (a) => writeJson(adminsDbPath, a);
-const readCommunityPosts = () => readJson(communityDbPath, []);
+const readCommunityPosts = () => readJson(communityDbPath, initialCommunityPosts);
 const writeCommunityPosts = (posts) => writeJson(communityDbPath, posts);
 const readSpecialChallenges = () => readJson(specialChallengesDbPath, defaultSpecialChallenges);
 const writeSpecialChallenges = (challenges) => writeJson(specialChallengesDbPath, challenges);
@@ -161,6 +165,7 @@ const buildQrCatalog = async () => {
   const categoryItems = await Promise.all(
     categoryQrConfigurations.map(async (cat) => ({
       ...cat,
+      code: cat.scanCode,
       qrCode: await generateSingleQr(cat.scanCode, '#0f172a')
     }))
   );
@@ -227,7 +232,35 @@ app.get('/api/admin/qr-codes', async (_req, res) => {
   }
 });
 
-// Activity Creation Endpoints
+app.get('/api/admin/community', (_req, res) => {
+  const posts = readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return res.json({ posts });
+});
+
+app.post('/api/admin/community', (req, res) => {
+  try {
+    const { message, image, author, role, isAnnouncement } = req.body;
+    if (!message && !image) return res.status(400).json({ message: 'Message or photo is required.' });
+
+    const posts = readCommunityPosts();
+    const post = {
+      id: crypto.randomUUID(),
+      author: isAnnouncement ? 'Wellness Team' : (author || 'Community Member'),
+      role: role || 'admin',
+      message: String(message || '').trim(),
+      image: String(image || '').trim(),
+      isAnnouncement: Boolean(isAnnouncement),
+      createdAt: new Date().toISOString()
+    };
+
+    posts.unshift(post);
+    writeCommunityPosts(posts);
+    return res.status(201).json({ post, posts });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 app.post('/api/admin/challenges', async (req, res) => {
   const { title, description, points, scanCode, proofPrompt } = req.body;
   if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
@@ -310,6 +343,30 @@ app.delete('/api/admin/running-challenges/:id', (req, res) => {
   return res.json({ deleted: true, challenges });
 });
 
+app.put('/api/participants/:id/profile', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, email, password, profileImage } = req.body;
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === id);
+
+    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
+
+    if (fullName) participants[idx].fullName = String(fullName).trim();
+    if (email) participants[idx].email = normalizeEmail(email);
+    if (profileImage !== undefined) participants[idx].profileImage = profileImage;
+
+    if (password && String(password).trim().length >= 6) {
+      participants[idx].password = await bcrypt.hash(String(password).trim(), 10);
+    }
+
+    writeParticipants(participants);
+    return res.json({ user: sanitizeUser(participants[idx]), message: 'Profile updated successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 app.post('/api/register', async (req, res) => {
   try {
     const fullName = String(req.body.fullName || '').trim();
@@ -372,6 +429,50 @@ app.get('/api/admin/stats', (_req, res) => {
     return res.json({
       stats: { totalParticipants, totalStamps, totalPoints, activeParticipants: participants.filter((p) => (p.stamps || []).length > 0).length }
     });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.put('/api/admin/participants/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, email, role } = req.body;
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === id);
+
+    if (idx === -1) return res.status(404).json({ message: 'User not found.' });
+    if (fullName) participants[idx].fullName = String(fullName).trim();
+    if (email) participants[idx].email = normalizeEmail(email);
+    if (role) participants[idx].role = role;
+
+    writeParticipants(participants);
+    return res.json({ user: sanitizeUser(participants[idx]), message: 'User updated successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/api/admin/participants/:id', (req, res) => {
+  try {
+    let participants = readParticipants();
+    participants = participants.filter((p) => p.id !== req.params.id);
+    writeParticipants(participants);
+    return res.json({ message: 'User deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/admin/participants/:id/promote', (req, res) => {
+  try {
+    const participants = readParticipants();
+    const idx = participants.findIndex((p) => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
+
+    participants[idx].role = 'admin';
+    writeParticipants(participants);
+    return res.json({ user: sanitizeUser(participants[idx]), message: `${participants[idx].fullName} assigned as admin.` });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -459,8 +560,6 @@ app.post('/api/participants/:id/stamps', (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
-
-app.get('/api/admin/community', (_req, res) => res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) }));
 
 app.get('/api/admin/report', (_req, res) => {
   const report = readParticipants().map((p) => {
