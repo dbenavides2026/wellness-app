@@ -1412,28 +1412,28 @@ export default function App() {
             </section>
           )}
 
-          {adminTab === 'qr' && (
-            <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-              <h3 style={{ color: '#0f172a' }}>Category & Activity QR Codes</h3>
-              <div className="qr-grid qr-sheet-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
-                {adminQrCodes.length === 0 ? (
-                  <div className="empty-state">Loading QR codes catalog…</div>
-                ) : (
-                  adminQrCodes.map((item) => (
-                    <div key={item.id || item.code} className="qr-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                      {item.qrCode ? (
-                        <img src={item.qrCode} alt={item.title} className="qr-image" style={{ width: '100%', maxWidth: '180px', height: 'auto', borderRadius: '8px' }} />
-                      ) : (
-                        <div style={{ width: '180px', height: '180px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#94a3b8' }}>Generating QR…</div>
-                      )}
-                      <strong style={{ display: 'block', margin: '0.75rem 0 0.25rem 0', color: '#0f172a', fontSize: '0.95rem' }}>{item.title}</strong>
-                      <small style={{ color: '#0b41cd', fontWeight: 'bold', fontFamily: 'monospace' }}>{item.code || item.scanCode}</small>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          )}
+         {adminTab === 'qr' && (
+  <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+    <h3 style={{ color: '#0f172a' }}>Category & Activity QR Codes</h3>
+    <div className="qr-grid qr-sheet-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
+      {adminQrCodes.length === 0 ? (
+        <div className="empty-state" style={{ width: '100%', textAlign: 'center', gridColumn: '1 / -1', padding: '2rem' }}>Loading QR codes catalog…</div>
+      ) : (
+        adminQrCodes.map((item) => (
+          <div key={item.id || item.code} className="qr-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            {item.qrCode ? (
+              <img src={item.qrCode} alt={item.title} className="qr-image" style={{ width: '100%', maxWidth: '180px', height: 'auto', borderRadius: '8px' }} />
+            ) : (
+              <div style={{ width: '180px', height: '180px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#94a3b8' }}>Generating QR…</div>
+            )}
+            <strong style={{ display: 'block', margin: '0.75rem 0 0.25rem 0', color: '#0f172a', fontSize: '0.95rem' }}>{item.title}</strong>
+            <small style={{ color: '#0b41cd', fontWeight: 'bold', fontFamily: 'monospace' }}>{item.scanCode || item.code}</small>
+          </div>
+        ))
+      )}
+    </div>
+  </section>
+)}
         </main>
       </div>
     );
