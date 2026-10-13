@@ -29,7 +29,7 @@ import {
   QrCode,
   MessageSquare
 } from 'lucide-react';
-import './App.css';
+import './App.css?v=20261013';
 
 const CURRENT_USER_KEY = 'wellness-passport-current-user';
 const ADMIN_USER_KEY = 'wellness-passport-admin-user';
@@ -709,7 +709,7 @@ export default function App() {
 
             {adminTab === 'admin' && (
               <>
-                <section className="admin-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <section className="admin-metrics">
                   <article className="metric-card accent"><span>Total participants</span><strong>{stats.totalParticipants || 0}</strong></article>
                   <article className="metric-card"><span>Active participants</span><strong>{stats.activeParticipants || 0}</strong></article>
                   <article className="metric-card"><span>Total stamps</span><strong>{stats.totalStamps || 0}</strong></article>
@@ -723,8 +723,8 @@ export default function App() {
                       {topWellnessUsers.map((u) => (
                         <div key={u.id} className="bar-row">
                           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{u.fullName}</span>
-                          <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
-                            <div className="bar-fill" style={{ width: `${(u.points / maxWellnessPts) * 100}%`, background: '#0b41cd', height: '100%' }} />
+                          <div className="bar-track">
+                            <div className="bar-fill" style={{ width: `${(u.points / maxWellnessPts) * 100}%` }} />
                           </div>
                           <strong style={{ color: '#0f172a' }}>{u.points} pts</strong>
                         </div>
@@ -738,8 +738,8 @@ export default function App() {
                       {topHikingUsers.map((u) => (
                         <div key={u.id} className="bar-row">
                           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{u.fullName}</span>
-                          <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
-                            <div className="bar-fill" style={{ width: `${(u.points / maxHikingPts) * 100}%`, background: '#15803d', height: '100%' }} />
+                          <div className="bar-track">
+                            <div className="bar-fill" style={{ width: `${(u.points / maxHikingPts) * 100}%`, background: '#15803d' }} />
                           </div>
                           <strong style={{ color: '#0f172a' }}>{u.points} pts</strong>
                         </div>
@@ -753,8 +753,8 @@ export default function App() {
                       {topRunningUsers.map((u) => (
                         <div key={u.id} className="bar-row">
                           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{u.fullName}</span>
-                          <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
-                            <div className="bar-fill" style={{ width: `${(u.points / maxRunningPts) * 100}%`, background: '#b45309', height: '100%' }} />
+                          <div className="bar-track">
+                            <div className="bar-fill" style={{ width: `${(u.points / maxRunningPts) * 100}%`, background: '#b45309' }} />
                           </div>
                           <strong style={{ color: '#0f172a' }}>{u.points} pts</strong>
                         </div>
