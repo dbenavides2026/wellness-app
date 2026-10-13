@@ -31,7 +31,7 @@ const initialCommunityPosts = [
     id: crypto.randomUUID(),
     author: 'Wellness Team',
     role: 'admin',
-    message: 'Welcome to the Wellness Community! Share your fitness wins, workout photos, and track your progress across all activities.',
+    message: 'Welcome to the Wellness Community! Share your fitness wins and track your progress across all activities.',
     image: '',
     isAnnouncement: true,
     createdAt: new Date().toISOString()
@@ -132,7 +132,6 @@ const sanitizeUser = (user) => {
   return rest;
 };
 
-// Default category check-ins (1 point for Hiking and Running Expeditions)
 const categoryQrConfigurations = [
   { id: 'gym', categoryId: 'gym', title: 'Gym / Solo Workout', points: 1, code: 'WELLNESS-GYM-101', scanCode: 'WELLNESS-GYM-101', isCategory: true },
   { id: 'group', categoryId: 'group', title: 'Group Fitness Class', points: 2, code: 'WELLNESS-GROUP-202', scanCode: 'WELLNESS-GROUP-202', isCategory: true },
@@ -147,13 +146,8 @@ const generateSingleQr = async (text, darkColor = '#0f172a') => {
   try {
     const codeString = String(text || '').trim();
     if (!codeString) return '';
-    return await QRCode.toDataURL(codeString, {
-      margin: 1,
-      width: 420,
-      color: { dark: darkColor, light: '#ffffff' }
-    });
+    return await QRCode.toDataURL(codeString, { margin: 1, width: 420, color: { dark: darkColor, light: '#ffffff' } });
   } catch (err) {
-    console.error(`Failed to generate QR for: ${text}`, err);
     return '';
   }
 };
@@ -220,7 +214,6 @@ const ensureSuperAdmin = async () => {
   writeAdmins(admins);
 };
 
-// API Endpoints
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/participants', (_req, res) => res.json({ participants: readParticipants().map(sanitizeUser) }));
 
@@ -233,6 +226,7 @@ app.get('/api/admin/qr-codes', async (_req, res) => {
   }
 });
 
+// Community Moderation API Endpoints
 app.get('/api/admin/community', (_req, res) => {
   const posts = readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return res.json({ posts });
@@ -260,6 +254,95 @@ app.post('/api/admin/community', (req, res) => {
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
+});
+
+app.put('/api/admin/community/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message, image } = req.body;
+    const posts = readCommunityPosts();
+    const idx = posts.findIndex((p) => p.id === id);
+
+    if (idx === -1) return res.status(404).json({ message: 'Post not found.' });
+
+    if (message !== undefined) posts[idx].message = String(message).trim();
+    if (image !== undefined) posts[idx].image = String(image).trim();
+
+    writeCommunityPosts(posts);
+    return res.json({ post: posts[idx], posts, message: 'Community post updated.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/api/admin/community/:id', (req, res) => {
+  try {
+    let posts = readCommunityPosts();
+    posts = posts.filter((p) => p.id !== req.params.id);
+    writeCommunityPosts(posts);
+    return res.json({ deleted: true, posts, message: 'Community post removed.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// Campaign Management with Filtered Point Resets
+app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
+app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
+app.get('/api/admin/running-status', (_req, res) => res.json({ status: readRunningStatus() }));
+
+app.post('/api/admin/challenge-status/start', (req, res) => {
+  const status = { isActive: true, title: String(req.body.title || 'Active Wellness Challenge Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+  writeChallengeStatus(status);
+  return res.status(201).json({ status });
+});
+
+app.post('/api/admin/challenge-status/end', (_req, res) => {
+  // Reset only Wellness stamps for participants
+  const participants = readParticipants().map((p) => ({
+    ...p,
+    stamps: (p.stamps || []).filter((s) => s.scanCode?.startsWith('HIKING-') || s.scanCode?.startsWith('RUNNING-'))
+  }));
+  writeParticipants(participants);
+  const status = { isActive: false, title: 'Wellness Campaign Ended', startedAt: '', endedAt: new Date().toISOString() };
+  writeChallengeStatus(status);
+  return res.json({ status });
+});
+
+app.post('/api/admin/hiking-status/start', (req, res) => {
+  const status = { isActive: true, title: String(req.body.title || 'Active Hiking Season Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+  writeHikingStatus(status);
+  return res.status(201).json({ status });
+});
+
+app.post('/api/admin/hiking-status/end', (_req, res) => {
+  // Reset only Hiking stamps for participants
+  const participants = readParticipants().map((p) => ({
+    ...p,
+    stamps: (p.stamps || []).filter((s) => !s.scanCode?.startsWith('HIKING-'))
+  }));
+  writeParticipants(participants);
+  const status = { isActive: false, title: 'Hiking Season Ended', startedAt: '', endedAt: new Date().toISOString() };
+  writeHikingStatus(status);
+  return res.json({ status });
+});
+
+app.post('/api/admin/running-status/start', (req, res) => {
+  const status = { isActive: true, title: String(req.body.title || 'Active Running Season Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
+  writeRunningStatus(status);
+  return res.status(201).json({ status });
+});
+
+app.post('/api/admin/running-status/end', (_req, res) => {
+  // Reset only Running stamps for participants
+  const participants = readParticipants().map((p) => ({
+    ...p,
+    stamps: (p.stamps || []).filter((s) => !s.scanCode?.startsWith('RUNNING-'))
+  }));
+  writeParticipants(participants);
+  const status = { isActive: false, title: 'Running Season Ended', startedAt: '', endedAt: new Date().toISOString() };
+  writeRunningStatus(status);
+  return res.json({ status });
 });
 
 app.post('/api/admin/challenges', async (req, res) => {
@@ -477,48 +560,6 @@ app.post('/api/admin/participants/:id/promote', (req, res) => {
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
-});
-
-app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
-app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
-app.get('/api/admin/running-status', (_req, res) => res.json({ status: readRunningStatus() }));
-
-app.post('/api/admin/challenge-status/start', (req, res) => {
-  const status = { isActive: true, title: String(req.body.title || 'Active Wellness Challenge Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
-  writeChallengeStatus(status);
-  return res.status(201).json({ status });
-});
-
-app.post('/api/admin/challenge-status/end', (_req, res) => {
-  const participants = readParticipants().map((p) => ({ ...p, stamps: [] }));
-  writeParticipants(participants);
-  const status = { isActive: false, title: 'Wellness Campaign Ended', startedAt: '', endedAt: new Date().toISOString() };
-  writeChallengeStatus(status);
-  return res.json({ status });
-});
-
-app.post('/api/admin/hiking-status/start', (req, res) => {
-  const status = { isActive: true, title: String(req.body.title || 'Active Hiking Season Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
-  writeHikingStatus(status);
-  return res.status(201).json({ status });
-});
-
-app.post('/api/admin/hiking-status/end', (_req, res) => {
-  const status = { isActive: false, title: 'Hiking Season Ended', startedAt: '', endedAt: new Date().toISOString() };
-  writeHikingStatus(status);
-  return res.json({ status });
-});
-
-app.post('/api/admin/running-status/start', (req, res) => {
-  const status = { isActive: true, title: String(req.body.title || 'Active Running Season Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
-  writeRunningStatus(status);
-  return res.status(201).json({ status });
-});
-
-app.post('/api/admin/running-status/end', (_req, res) => {
-  const status = { isActive: false, title: 'Running Season Ended', startedAt: '', endedAt: new Date().toISOString() };
-  writeRunningStatus(status);
-  return res.json({ status });
 });
 
 app.post('/api/participants/:id/stamps', (req, res) => {
