@@ -16,7 +16,7 @@ app.use(express.json({ limit: '10mb' }));
 const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
 const superadminPasswordHash = bcrypt.hashSync('WellnessDigit@l*2026', 10);
 
-// In-Memory Data Storage
+// Base de datos en memoria
 let participants = [
   {
     id: 'superadmin-1',
@@ -40,7 +40,7 @@ let communityPosts = [
   { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, createdAt: new Date().toISOString() }
 ];
 
-// Password Policy Validator
+// Validador de política de contraseñas
 function validatePasswordPolicy(password) {
   const minLength = 8;
   const maxLength = 16;
@@ -48,37 +48,27 @@ function validatePasswordPolicy(password) {
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
-  if (password.length < minLength || password.length > maxLength) {
-    return 'Password must be between 8 and 16 characters.';
-  }
-  if (!hasUppercase) {
-    return 'Password must contain at least one uppercase letter.';
-  }
-  if (!hasNumber) {
-    return 'Password must contain at least one number.';
-  }
-  if (!hasSpecial) {
-    return 'Password must contain at least one special character (!@#$%^&*...).';
-  }
+  if (password.length < minLength || password.length > maxLength) return 'Password must be between 8 and 16 characters.';
+  if (!hasUppercase) return 'Password must contain at least one uppercase letter.';
+  if (!hasNumber) return 'Password must contain at least one number.';
+  if (!hasSpecial) return 'Password must contain at least one special character (!@#$%^&*...).';
   return null;
 }
 
-// Reliable Promise Wrapper for QR Code Generation
-function generateQrDataUrl(codeText) {
-  return new Promise((resolve) => {
-    QRCode.toString(codeText, { type: 'svg', margin: 2 }, (err, svg) => {
-      if (err || !svg) {
-        console.error(`QR Generation error for code: ${codeText}`, err);
-        resolve('');
-      } else {
-        const encodedSvg = encodeURIComponent(svg);
-        resolve(`data:image/svg+xml;charset=utf-8,${encodedSvg}`);
-      }
-    });
-  });
+// Generador de QR ultra-confiable (Data URL SVG puro)
+async function generateQrDataUrl(codeText) {
+  try {
+    const svgString = await QRCode.toString(codeText, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' });
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svgString)}`;
+  } catch (err) {
+    console.error(`Error generando QR para ${codeText}:`, err);
+    // Fallback con imagen SVG embebida directa
+    const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180"><rect width="100%" height="100%" fill="#f1f5f9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0b41cd">${codeText}</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
+  }
 }
 
-// QR Catalog Generator
+// Catálogo de Códigos QR
 async function getQrCodeCatalog() {
   const baseItems = [
     { id: 'gym', title: 'Gym / Solo Workout', code: 'WELLNESS-GYM-101' },
@@ -96,21 +86,24 @@ async function getQrCodeCatalog() {
 
   const allItems = [...baseItems, ...specialItems];
 
-  const catalog = [];
-  for (const item of allItems) {
-    const code = item.code || 'WELLNESS-DEFAULT';
-    const qrCode = await generateQrDataUrl(code);
-    catalog.push({
-      ...item,
-      scanCode: code,
-      qrCode
-    });
-  }
+  const catalog = await Promise.all(
+    allItems.map(async (item) => {
+      const code = item.code || 'WELLNESS-DEFAULT';
+      const qrCode = await generateQrDataUrl(code);
+      return {
+        id: item.id,
+        title: item.title,
+        scanCode: code,
+        code: code,
+        qrCode: qrCode
+      };
+    })
+  );
 
   return catalog;
 }
 
-// API Routes
+// Rutas de API
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const user = participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
@@ -190,7 +183,7 @@ app.put('/api/participants/:id/profile', async (req, res) => {
   res.json({ user: userPayload });
 });
 
-// Campaign & Challenge Management
+// Desafíos y Campañas
 app.get('/api/challenges', (req, res) => res.json({ challenges: specialChallenges }));
 app.get('/api/hiking-challenges', (req, res) => res.json({ challenges: hikingChallenges }));
 app.get('/api/running-challenges', (req, res) => res.json({ challenges: runningChallenges }));
@@ -271,7 +264,7 @@ app.delete('/api/admin/running-challenges/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-// Community Feed
+// Comunidad
 app.get('/api/admin/community', (req, res) => res.json({ posts: communityPosts }));
 app.post('/api/admin/community', (req, res) => {
   const { author, role, message, image, isAnnouncement } = req.body;
@@ -285,7 +278,7 @@ app.delete('/api/admin/community/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-// Stats & QR Catalog
+// Estadísticas y Catálogo QR
 app.get('/api/admin/stats', (req, res) => {
   const totalParticipants = participants.length;
   const activeParticipants = participants.filter(p => (p.stamps || []).length > 0).length;
@@ -300,8 +293,8 @@ app.get('/api/admin/qr-codes', async (req, res) => {
     const qrCodes = await getQrCodeCatalog();
     res.json({ qrCodes });
   } catch (err) {
-    console.error('Error serving QR catalog:', err);
-    res.status(500).json({ message: 'Failed to generate QR catalog.' });
+    console.error('Error al generar catálogo de QR:', err);
+    res.status(500).json({ message: 'Error generando catálogo de QR.' });
   }
 });
 
@@ -317,7 +310,7 @@ app.delete('/api/admin/participants/:id', (req, res) => {
   res.json({ message: 'User deleted.' });
 });
 
-// Static Production Hosting & No-Cache Rules
+// Archivos Estáticos de Producción
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
