@@ -27,12 +27,15 @@ import {
   BarChart2,
   FileText,
   QrCode,
-  MessageSquare
+  MessageSquare,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import './App.css';
 
 const CURRENT_USER_KEY = 'wellness-passport-current-user';
 const ADMIN_USER_KEY = 'wellness-passport-admin-user';
+
+const PIE_COLORS = ['#0b41cd', '#15803d', '#b45309', '#7c3aed', '#ec4899', '#06b6d4', '#f59e0b', '#10b981'];
 
 const categories = [
   { id: 'gym', title: 'Gym / Solo Workout', points: 1, iconType: 'dumbbell', scanCode: 'WELLNESS-GYM-101', proofPrompt: 'Upload a picture of your workout setup or equipment log.' },
@@ -640,6 +643,80 @@ export default function App() {
     </div>
   );
 
+  const renderStampsPieChart = () => {
+    const activityCounts = {};
+    participants.forEach((p) => {
+      (p.stamps || []).forEach((s) => {
+        const key = s.title || 'General Activity';
+        activityCounts[key] = (activityCounts[key] || 0) + 1;
+      });
+    });
+
+    const entries = Object.entries(activityCounts);
+    const totalStamps = entries.reduce((sum, [, count]) => sum + count, 0);
+
+    if (totalStamps === 0) {
+      return (
+        <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
+          <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <PieChartIcon size={20} color="#0b41cd" /> Stamps per Activity
+          </h3>
+          <div className="empty-activity-box" style={{ padding: '2rem' }}>No stamps recorded across activities yet.</div>
+        </div>
+      );
+    }
+
+    let cumulativePercent = 0;
+
+    return (
+      <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
+        <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <PieChartIcon size={20} color="#0b41cd" /> Stamps per Activity
+        </h3>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <svg viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)', width: '150px', height: '150px' }}>
+            {entries.map(([title, count], index) => {
+              const fraction = count / totalStamps;
+              const color = PIE_COLORS[index % PIE_COLORS.length];
+              
+              const startAngle = cumulativePercent * 2 * Math.PI;
+              cumulativePercent += fraction;
+              const endAngle = cumulativePercent * 2 * Math.PI;
+
+              const x1 = Math.cos(startAngle);
+              const y1 = Math.sin(startAngle);
+              const x2 = Math.cos(endAngle);
+              const y2 = Math.sin(endAngle);
+
+              const largeArcFlag = fraction > 0.5 ? 1 : 0;
+              const pathData = fraction >= 0.999 
+                ? `M 1 0 A 1 1 0 1 1 -1 0 A 1 1 0 1 1 1 0`
+                : `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+
+              return <path key={title} d={pathData} fill={color} />;
+            })}
+          </svg>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '180px' }}>
+            {entries.map(([title, count], index) => {
+              const color = PIE_COLORS[index % PIE_COLORS.length];
+              const pct = Math.round((count / totalStamps) * 100);
+
+              return (
+                <div key={title} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: color, display: 'inline-block' }} />
+                  <span style={{ flex: 1, fontWeight: 600, color: '#334155' }}>{title}</span>
+                  <strong style={{ color: '#0f172a' }}>{count} ({pct}%)</strong>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const getTopUsersByFilter = (filterFn) => {
     return participants.map((p) => {
       const filteredStamps = (p.stamps || []).filter(filterFn);
@@ -763,7 +840,7 @@ export default function App() {
                 <article className="metric-card"><span>Total points</span><strong>{stats.totalPoints || 0}</strong></article>
               </section>
 
-              <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
                   <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Top 10: Wellness Challenge</h3>
                   <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -809,6 +886,9 @@ export default function App() {
                   </div>
                 </div>
               </section>
+
+              {/* NEW STAMPS PER ACTIVITY PIE CHART */}
+              {renderStampsPieChart()}
             </>
           )}
 
