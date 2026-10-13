@@ -27,8 +27,7 @@ import {
   BarChart2,
   FileText,
   QrCode,
-  MessageSquare,
-  IdCard
+  MessageSquare
 } from 'lucide-react';
 import './App.css';
 
@@ -604,7 +603,7 @@ export default function App() {
   if (screen === 'login') {
     return (
       <div className="auth-app"><div className="auth-card">
-        <div className="auth-header"><span className="brand-badge"><IdCard className="button-icon" /></span><h1>Wellness Passport</h1><p>Sign in to track activity and submit pictures.</p></div>
+        <div className="auth-header"><h1>Wellness Passport</h1><p>Sign in to track activity and submit pictures.</p></div>
         <form className="auth-form" onSubmit={handleLogin}>
           <label><span className="input-label"><Mail className="input-icon" /> Email</span><input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required /></label>
           <label><span className="input-label"><Lock className="input-icon" /> Password</span><input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required /></label>
@@ -622,7 +621,7 @@ export default function App() {
   if (screen === 'register') {
     return (
       <div className="auth-app"><div className="auth-card">
-        <div className="auth-header"><span className="brand-badge"><IdCard className="button-icon" /></span><h1>Create account</h1></div>
+        <div className="auth-header"><h1>Create account</h1></div>
         <form className="auth-form" onSubmit={handleRegister}>
           <label><span className="input-label">Full name</span><input type="text" value={registerForm.fullName} onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })} required /></label>
           <label><span className="input-label">Email</span><input type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} required /></label>
@@ -639,7 +638,7 @@ export default function App() {
   if (screen === 'admin-login') {
     return (
       <div className="auth-app"><div className="auth-card">
-        <div className="auth-header"><span className="brand-badge admin-badge"><ShieldCheck className="button-icon" /></span><h1>Admin portal</h1></div>
+        <div className="auth-header"><h1>Admin portal</h1></div>
         <form className="auth-form" onSubmit={handleAdminLogin}>
           <label><span className="input-label">Admin email</span><input type="email" value={adminLoginForm.email} onChange={(e) => setAdminLoginForm({ ...adminLoginForm, email: e.target.value })} required /></label>
           <label><span className="input-label">Password</span><input type="password" value={adminLoginForm.password} onChange={(e) => setAdminLoginForm({ ...adminLoginForm, password: e.target.value })} required /></label>
