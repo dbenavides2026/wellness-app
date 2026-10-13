@@ -14,8 +14,6 @@ const PORT = process.env.PORT || 3001;
 app.use(express.json({ limit: '10mb' }));
 
 const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
-
-// Generate dynamic salt and hash on runtime startup
 const superadminPasswordHash = bcrypt.hashSync('WellnessDigit@l*2026', 10);
 
 // In-Memory Data Storage
@@ -65,27 +63,35 @@ function validatePasswordPolicy(password) {
   return null;
 }
 
-// QR Catalog Generator
+// Fixed QR Catalog Generator
 async function getQrCodeCatalog() {
-  const items = [
+  const baseItems = [
     { id: 'gym', title: 'Gym / Solo Workout', code: 'WELLNESS-GYM-101' },
     { id: 'group', title: 'Group Fitness Class', code: 'WELLNESS-GROUP-202' },
     { id: 'sports', title: 'Sports & Outdoor Game', code: 'WELLNESS-SPORTS-303' },
     { id: 'hiking-club-checkin', title: 'Hiking Club Expedition', code: 'HIKING-CLUB-101' },
-    { id: 'running-club-checkin', title: 'Running Club Session', code: 'RUNNING-CLUB-101' },
-    ...specialChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || 'WELLNESS-SPECIAL-99' })),
-    ...hikingChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || 'HIKING-SPECIAL-99' })),
-    ...runningChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || 'RUNNING-SPECIAL-99' }))
+    { id: 'running-club-checkin', title: 'Running Club Session', code: 'RUNNING-CLUB-101' }
   ];
 
-  return Promise.all(items.map(async (item) => {
-    try {
-      const qrCode = await QRCode.toDataURL(item.code);
-      return { ...item, qrCode };
-    } catch {
-      return { ...item, qrCode: '' };
-    }
-  }));
+  const specialItems = [
+    ...specialChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `WELLNESS-SPEC-${c.id.slice(-4)}` })),
+    ...hikingChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `HIKING-SPEC-${c.id.slice(-4)}` })),
+    ...runningChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `RUNNING-SPEC-${c.id.slice(-4)}` }))
+  ];
+
+  const allItems = [...baseItems, ...specialItems];
+
+  return Promise.all(
+    allItems.map(async (item) => {
+      try {
+        const qrCode = await QRCode.toDataURL(item.code || 'WELLNESS-DEFAULT');
+        return { ...item, scanCode: item.code, qrCode };
+      } catch (err) {
+        console.error(`QR Generation failed for ${item.title}:`, err);
+        return { ...item, scanCode: item.code, qrCode: '' };
+      }
+    })
+  );
 }
 
 // API Routes
