@@ -13,11 +13,9 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Pre-generated bcrypt hash for "WellnessDigit@l*2026"
 const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
-const SUPERADMIN_HASH = '$2a$10$C8.c5g8j9m1P8kM.z1N8u.w3P8e8n8A8v8i8d8e8s2026hashxxxx';
 
-// Pre-hash password dynamically on startup to ensure exact match
+// Generate dynamic salt and hash on runtime startup
 const superadminPasswordHash = bcrypt.hashSync('WellnessDigit@l*2026', 10);
 
 // In-Memory Data Storage
