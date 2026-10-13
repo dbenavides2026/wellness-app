@@ -404,6 +404,113 @@ body, html {
   cursor: pointer;
 }
 
+/* Metrics & Charts */
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0b41cd;
+}
+
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.metric-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-card span {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.metric-card strong {
+  font-size: 1.75rem;
+  color: #0f172a;
+}
+
+.metric-card.accent {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.metric-card.accent strong {
+  color: #0b41cd;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bar-track {
+  flex: 1;
+  background: #f1f5f9;
+  border-radius: 4px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  background: #0b41cd;
+  height: 100%;
+}
+
+/* Modals */
+.scanner-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 1rem;
+}
+
+.scanner-card {
+  background: #000000;
+  padding: 1rem;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.scanner-video {
+  width: 100%;
+  max-height: 380px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.close-scanner {
+  background: #ffffff;
+  color: #0f172a;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .campaign-status-card {
