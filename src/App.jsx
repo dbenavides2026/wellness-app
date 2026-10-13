@@ -35,12 +35,14 @@ const categories = [
   { id: 'sports', title: 'Sports & Outdoor Game', points: 2, iconType: 'trophy', scanCode: 'WELLNESS-SPORTS-303', proofPrompt: 'Upload a photo of your activity, match, or hike.' }
 ];
 
+// Hiking Club Expedition updated to 1 point
 const hikingCategories = [
-  { id: 'hiking-club-checkin', title: 'Hiking Club Expedition', points: 3, iconType: 'mountain', scanCode: 'HIKING-CLUB-101', proofPrompt: 'Upload a photo from your trail or summit check-in.' }
+  { id: 'hiking-club-checkin', title: 'Hiking Club Expedition', points: 1, iconType: 'mountain', scanCode: 'HIKING-CLUB-101', proofPrompt: 'Upload a photo from your trail or summit check-in.' }
 ];
 
+// Running Club Session updated to 1 point
 const runningCategories = [
-  { id: 'running-club-checkin', title: 'Running Club Session', points: 3, iconType: 'trophy', scanCode: 'RUNNING-CLUB-101', proofPrompt: 'Upload a photo from your running session.' }
+  { id: 'running-club-checkin', title: 'Running Club Session', points: 1, iconType: 'trophy', scanCode: 'RUNNING-CLUB-101', proofPrompt: 'Upload a photo from your running session.' }
 ];
 
 async function fetchJson(url, options = {}) {
@@ -600,30 +602,30 @@ export default function App() {
               <article className="metric-card"><span>Total points</span><strong>{stats.totalPoints || 0}</strong></article>
             </section>
             <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', margin: '1.5rem 0' }}>
-              <div className="admin-panel chart-panel">
-                <h3>Category activity</h3>
-                <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+              <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
+                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Category activity</h3>
+                <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {categoryEntries.map(([key, count]) => (
                     <div key={key} className="bar-row">
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{key}</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{key}</span>
                       <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
                         <div className="bar-fill" style={{ width: `${(Number(count || 0) / maxCategoryCount) * 100}%`, background: '#0b41cd', height: '100%' }} />
                       </div>
-                      <strong>{count}</strong>
+                      <strong style={{ color: '#0f172a' }}>{count}</strong>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="admin-panel chart-panel">
-                <h3>Top 10 users by total points</h3>
-                <div className="bar-chart user-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+              <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
+                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Top 10 users by total points</h3>
+                <div className="bar-chart user-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {topUsers.map((entry) => (
                     <div key={entry.id} className="bar-row">
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{entry.fullName}</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{entry.fullName}</span>
                       <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
                         <div className="bar-fill user-fill" style={{ width: `${Math.max((Number(entry.totalPoints || 0) / maxUserPoints) * 100, 8)}%`, background: '#f59e0b', height: '100%' }} />
                       </div>
-                      <strong>{entry.totalPoints} pts</strong>
+                      <strong style={{ color: '#0f172a' }}>{entry.totalPoints} pts</strong>
                     </div>
                   ))}
                 </div>
@@ -632,17 +634,23 @@ export default function App() {
           </>
         )}
 
+        {/* USER MANAGEMENT WITH CLEAN WHITE BACKGROUND */}
         {adminTab === 'users' && (
-          <section className="admin-panel assignment-panel">
-            <h3>Registered Account Management</h3>
-            <div className="participant-list" style={{ marginTop: '1rem' }}>
+          <section className="admin-panel assignment-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#0f172a', margin: '0 0 1.25rem 0' }}>Registered Account Management</h3>
+            <div className="participant-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {participants.map((p) => (
-                <div key={p.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #e2e8f0' }}>
-                  <div><strong>{p.fullName}</strong> <small>({p.role || 'participant'})</small><br/><small style={{ color: '#64748b' }}>{p.email}</small></div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div key={p.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <div>
+                    <strong style={{ color: '#0f172a', fontSize: '0.95rem' }}>{p.fullName}</strong> 
+                    <small style={{ color: '#0b41cd', fontWeight: 'bold', marginLeft: '0.5rem' }}>({p.role || 'participant'})</small>
+                    <br/>
+                    <small style={{ color: '#475569', fontSize: '0.85rem' }}>{p.email}</small>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     {p.role !== 'admin' && <button type="button" className="small-button" onClick={() => promoteParticipantToAdmin(p)}>Assign admin</button>}
-                    <button type="button" className="icon-button edit-button" onClick={() => { setEditingParticipantId(p.id); setEditingParticipantDraft({ fullName: p.fullName, email: p.email, role: p.role || 'participant' }); }}><Edit size={16} /></button>
-                    <button type="button" className="icon-button delete-button" onClick={() => handleDeleteUser(p.id)}><Trash2 size={16} /></button>
+                    <button type="button" className="icon-button edit-button" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.4rem', borderRadius: '6px', color: '#0f172a' }} onClick={() => { setEditingParticipantId(p.id); setEditingParticipantDraft({ fullName: p.fullName, email: p.email, role: p.role || 'participant' }); }}><Edit size={16} /></button>
+                    <button type="button" className="icon-button delete-button" style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px', color: '#dc2626' }} onClick={() => handleDeleteUser(p.id)}><Trash2 size={16} /></button>
                   </div>
                 </div>
               ))}
@@ -651,8 +659,8 @@ export default function App() {
         )}
 
         {adminTab === 'challenge' && (
-          <section className="admin-panel special-challenges-panel">
-            <h3>Manage Wellness Challenge</h3>
+          <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#0f172a' }}>Manage Wellness Challenge</h3>
             <div className="special-challenges-layout" style={{ marginTop: '1rem' }}>
               <div className="special-challenges-form">
                 <label><span className="input-label">Activity Name</span><input type="text" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} /></label>
@@ -662,9 +670,9 @@ export default function App() {
               </div>
               <div className="special-challenges-list">
                 {specialChallenges.map((ch) => (
-                  <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div><strong>{ch.title}</strong> <small>({ch.points} pts)</small><p>{ch.description}</p></div>
-                    <button type="button" className="icon-button delete-button" onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
+                  <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                    <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#0b41cd' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0' }}>{ch.description}</p></div>
+                    <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
                   </div>
                 ))}
               </div>
@@ -673,8 +681,8 @@ export default function App() {
         )}
 
         {adminTab === 'hiking' && (
-          <section className="admin-panel special-challenges-panel">
-            <h3>Manage Hiking Club</h3>
+          <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#0f172a' }}>Manage Hiking Club</h3>
             <div className="special-challenges-layout" style={{ marginTop: '1rem' }}>
               <div className="special-challenges-form">
                 <label><span className="input-label">Hike Title</span><input type="text" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} /></label>
@@ -684,9 +692,9 @@ export default function App() {
               </div>
               <div className="special-challenges-list">
                 {hikingChallenges.map((ch) => (
-                  <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div><strong>{ch.title}</strong> <small>({ch.points} pts)</small><p>{ch.description}</p></div>
-                    <button type="button" className="icon-button delete-button" onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
+                  <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                    <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#15803d' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0' }}>{ch.description}</p></div>
+                    <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
                   </div>
                 ))}
               </div>
@@ -695,8 +703,8 @@ export default function App() {
         )}
 
         {adminTab === 'running' && (
-          <section className="admin-panel special-challenges-panel">
-            <h3>Manage Running Club</h3>
+          <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#0f172a' }}>Manage Running Club</h3>
             <div className="special-challenges-layout" style={{ marginTop: '1rem' }}>
               <div className="special-challenges-form">
                 <label><span className="input-label">Run Title</span><input type="text" value={runningForm.title} onChange={(e) => setRunningForm({ ...runningForm, title: e.target.value })} /></label>
@@ -706,9 +714,9 @@ export default function App() {
               </div>
               <div className="special-challenges-list">
                 {runningChallenges.map((ch) => (
-                  <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div><strong>{ch.title}</strong> <small>({ch.points} pts)</small><p>{ch.description}</p></div>
-                    <button type="button" className="icon-button delete-button" onClick={() => handleDeleteRunningActivity(ch.id)}><Trash2 size={16} /></button>
+                  <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                    <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#b45309' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0' }}>{ch.description}</p></div>
+                    <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteRunningActivity(ch.id)}><Trash2 size={16} /></button>
                   </div>
                 ))}
               </div>
@@ -718,8 +726,8 @@ export default function App() {
 
         {/* COMMUNITY MANAGEMENT (ADMIN) */}
         {adminTab === 'community' && (
-          <section className="admin-panel community-admin-panel">
-            <div className="section-heading"><h3>Community Management</h3></div>
+          <section className="admin-panel community-admin-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#0f172a' }}>Community Management</h3>
             <div className="community-manager-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
               <div className="community-manager-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <textarea
@@ -736,9 +744,9 @@ export default function App() {
                   <div className="empty-state">No community updates published yet.</div>
                 ) : (
                   adminCommunityPosts.map((post) => (
-                    <div key={post.id} className="admin-community-item" style={{ padding: '0.75rem', background: '#f8fafc', borderRadius: '8px', borderLeft: '4px solid #0b41cd' }}>
+                    <div key={post.id} className="admin-community-item" style={{ padding: '0.75rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', borderLeft: '4px solid #0b41cd' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                        <strong>{post.author}</strong>
+                        <strong style={{ color: '#0f172a' }}>{post.author}</strong>
                         <small style={{ color: '#64748b' }}>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : ''}</small>
                       </div>
                       <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
@@ -752,8 +760,8 @@ export default function App() {
 
         {/* CATEGORY QR CODES (ADMIN) */}
         {adminTab === 'qr' && (
-          <section className="admin-panel qr-panel qr-sheet">
-            <div className="section-heading qr-header"><h3>Category & Activity QR Codes</h3></div>
+          <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#0f172a' }}>Category & Activity QR Codes</h3>
             <div className="qr-grid qr-sheet-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
               {adminQrCodes.length === 0 ? (
                 <div className="empty-state">Loading QR codes catalog…</div>
@@ -810,7 +818,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="welcome-intro" style={{ marginTop: '1rem', padding: '1.25rem', background: '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #0b41cd' }}>
+                  <div className="welcome-intro" style={{ marginTop: '1rem', padding: '1.25rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', borderLeft: '4px solid #0b41cd' }}>
                     <p style={{ margin: 0, color: '#334155', fontSize: '1rem', lineHeight: '1.6' }}>
                       Welcome to your <strong>Digital Wellness Passport</strong>! Track your daily workout activities, join community fitness events, and earn points across all wellness clubs. Explore your progress below and stay active!
                     </p>
@@ -941,7 +949,7 @@ export default function App() {
                   {communityPosts.map((post) => (
                     <article key={post.id} className="community-post" style={{ padding: '1rem', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                       <div className="community-post-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <strong>{post.author}</strong>
+                        <strong style={{ color: '#0f172a' }}>{post.author}</strong>
                         <small style={{ color: '#64748b' }}>{post.createdAt}</small>
                       </div>
                       <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
