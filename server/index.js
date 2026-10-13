@@ -16,7 +16,6 @@ const communityDbPath = path.join(dataDir, 'community.json');
 const specialChallengesDbPath = path.join(dataDir, 'special-challenges.json');
 const challengeStatusPath = path.join(dataDir, 'challenge-status.json');
 
-// Hiking & Running Databases
 const hikingChallengesDbPath = path.join(dataDir, 'hiking-challenges.json');
 const hikingStatusPath = path.join(dataDir, 'hiking-status.json');
 const runningChallengesDbPath = path.join(dataDir, 'running-challenges.json');
@@ -49,7 +48,7 @@ const defaultSpecialChallenges = [
     description: 'Complete 10,000 steps across the week and log your movement with proof.',
     points: 10,
     scanCode: 'WELLNESS-CHALLENGE-STEPS',
-    proofPrompt: 'Upload a photo showing your steps challenge progress or movement moment.'
+    proofPrompt: 'Upload a picture showing your steps challenge progress or movement moment.'
   }
 ];
 
@@ -61,7 +60,7 @@ const defaultChallengeStatus = { isActive: true, title: 'Active Wellness Challen
 if (!fs.existsSync(challengeStatusPath)) fs.writeFileSync(challengeStatusPath, JSON.stringify(defaultChallengeStatus, null, 2));
 
 const defaultHikingChallenges = [
-  { id: crypto.randomUUID(), title: 'Summit Peak Hike', description: 'Reach the summit peak and log your check-in code.', points: 15, scanCode: 'HIKING-SUMMIT-101', proofPrompt: 'Upload a photo at the peak summit.' }
+  { id: crypto.randomUUID(), title: 'Summit Peak Hike', description: 'Reach the summit peak and log your check-in code.', points: 15, scanCode: 'HIKING-SUMMIT-101', proofPrompt: 'Upload a picture at the peak summit.' }
 ];
 if (!fs.existsSync(hikingChallengesDbPath)) fs.writeFileSync(hikingChallengesDbPath, JSON.stringify(defaultHikingChallenges, null, 2));
 
@@ -69,7 +68,7 @@ const defaultHikingStatus = { isActive: true, title: 'Active Hiking Season Campa
 if (!fs.existsSync(hikingStatusPath)) fs.writeFileSync(hikingStatusPath, JSON.stringify(defaultHikingStatus, null, 2));
 
 const defaultRunningChallenges = [
-  { id: crypto.randomUUID(), title: '5K Morning Run', description: 'Complete a 5K morning run and scan your finish code.', points: 12, scanCode: 'RUNNING-5K-101', proofPrompt: 'Upload a photo from your run.' }
+  { id: crypto.randomUUID(), title: '5K Morning Run', description: 'Complete a 5K morning run and scan your finish code.', points: 12, scanCode: 'RUNNING-5K-101', proofPrompt: 'Upload a picture from your run.' }
 ];
 if (!fs.existsSync(runningChallengesDbPath)) fs.writeFileSync(runningChallengesDbPath, JSON.stringify(defaultRunningChallenges, null, 2));
 
@@ -158,47 +157,19 @@ const buildQrCatalog = async () => {
   const runningChallenges = readRunningChallenges();
 
   const categoryItems = await Promise.all(
-    categoryQrConfigurations.map(async (cat) => ({
-      ...cat,
-      code: cat.scanCode,
-      qrCode: await generateSingleQr(cat.scanCode, '#0f172a')
-    }))
+    categoryQrConfigurations.map(async (cat) => ({ ...cat, code: cat.scanCode, qrCode: await generateSingleQr(cat.scanCode, '#0f172a') }))
   );
 
   const challengeItems = await Promise.all(
-    specialChallenges.map(async (ch) => ({
-      id: ch.id,
-      title: ch.title,
-      points: Number(ch.points || 10),
-      code: ch.scanCode,
-      scanCode: ch.scanCode,
-      isCategory: false,
-      qrCode: await generateSingleQr(ch.scanCode, '#0f172a')
-    }))
+    specialChallenges.map(async (ch) => ({ id: ch.id, title: ch.title, points: Number(ch.points || 10), code: ch.scanCode, scanCode: ch.scanCode, isCategory: false, qrCode: await generateSingleQr(ch.scanCode, '#0f172a') }))
   );
 
   const hikingItems = await Promise.all(
-    hikingChallenges.map(async (ch) => ({
-      id: ch.id,
-      title: `[Hiking] ${ch.title}`,
-      points: Number(ch.points || 15),
-      code: ch.scanCode,
-      scanCode: ch.scanCode,
-      isCategory: false,
-      qrCode: await generateSingleQr(ch.scanCode, '#15803d')
-    }))
+    hikingChallenges.map(async (ch) => ({ id: ch.id, title: `[Hiking] ${ch.title}`, points: Number(ch.points || 15), code: ch.scanCode, scanCode: ch.scanCode, isCategory: false, qrCode: await generateSingleQr(ch.scanCode, '#15803d') }))
   );
 
   const runningItems = await Promise.all(
-    runningChallenges.map(async (ch) => ({
-      id: ch.id,
-      title: `[Running] ${ch.title}`,
-      points: Number(ch.points || 12),
-      code: ch.scanCode,
-      scanCode: ch.scanCode,
-      isCategory: false,
-      qrCode: await generateSingleQr(ch.scanCode, '#b45309')
-    }))
+    runningChallenges.map(async (ch) => ({ id: ch.id, title: `[Running] ${ch.title}`, points: Number(ch.points || 12), code: ch.scanCode, scanCode: ch.scanCode, isCategory: false, qrCode: await generateSingleQr(ch.scanCode, '#b45309') }))
   );
 
   return [...categoryItems, ...challengeItems, ...hikingItems, ...runningItems];
@@ -226,7 +197,7 @@ app.get('/api/admin/qr-codes', async (_req, res) => {
   }
 });
 
-// Community Moderation API Endpoints
+// Community API
 app.get('/api/admin/community', (_req, res) => {
   const posts = readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return res.json({ posts });
@@ -241,7 +212,7 @@ app.post('/api/admin/community', (req, res) => {
     const post = {
       id: crypto.randomUUID(),
       author: isAnnouncement ? 'Wellness Team' : (author || 'Community Member'),
-      role: role || 'admin',
+      role: role || 'participant',
       message: String(message || '').trim(),
       image: String(image || '').trim(),
       isAnnouncement: Boolean(isAnnouncement),
@@ -286,7 +257,7 @@ app.delete('/api/admin/community/:id', (req, res) => {
   }
 });
 
-// Campaign Management with Filtered Point Resets
+// Campaign Management
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
 app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
 app.get('/api/admin/running-status', (_req, res) => res.json({ status: readRunningStatus() }));
@@ -298,7 +269,6 @@ app.post('/api/admin/challenge-status/start', (req, res) => {
 });
 
 app.post('/api/admin/challenge-status/end', (_req, res) => {
-  // Reset only Wellness stamps for participants
   const participants = readParticipants().map((p) => ({
     ...p,
     stamps: (p.stamps || []).filter((s) => s.scanCode?.startsWith('HIKING-') || s.scanCode?.startsWith('RUNNING-'))
@@ -316,7 +286,6 @@ app.post('/api/admin/hiking-status/start', (req, res) => {
 });
 
 app.post('/api/admin/hiking-status/end', (_req, res) => {
-  // Reset only Hiking stamps for participants
   const participants = readParticipants().map((p) => ({
     ...p,
     stamps: (p.stamps || []).filter((s) => !s.scanCode?.startsWith('HIKING-'))
@@ -334,7 +303,6 @@ app.post('/api/admin/running-status/start', (req, res) => {
 });
 
 app.post('/api/admin/running-status/end', (_req, res) => {
-  // Reset only Running stamps for participants
   const participants = readParticipants().map((p) => ({
     ...p,
     stamps: (p.stamps || []).filter((s) => !s.scanCode?.startsWith('RUNNING-'))
@@ -351,15 +319,7 @@ app.post('/api/admin/challenges', async (req, res) => {
 
   const finalScanCode = String(scanCode || `WELLNESS-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
   const challenges = readSpecialChallenges();
-  const challenge = {
-    id: crypto.randomUUID(),
-    title: String(title).trim(),
-    description: String(description).trim(),
-    points: Number(points) || 10,
-    scanCode: finalScanCode,
-    proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim()
-  };
-
+  const challenge = { id: crypto.randomUUID(), title: String(title).trim(), description: String(description).trim(), points: Number(points) || 10, scanCode: finalScanCode, proofPrompt: String(proofPrompt || 'Upload a picture proof.').trim() };
   challenges.unshift(challenge);
   writeSpecialChallenges(challenges);
   return res.status(201).json({ challenge, challenges });
@@ -371,15 +331,7 @@ app.post('/api/admin/hiking-challenges', async (req, res) => {
 
   const finalScanCode = String(scanCode || `HIKING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
   const challenges = readHikingChallenges();
-  const challenge = {
-    id: crypto.randomUUID(),
-    title: String(title).trim(),
-    description: String(description).trim(),
-    points: Number(points) || 15,
-    scanCode: finalScanCode,
-    proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim()
-  };
-
+  const challenge = { id: crypto.randomUUID(), title: String(title).trim(), description: String(description).trim(), points: Number(points) || 15, scanCode: finalScanCode, proofPrompt: String(proofPrompt || 'Upload a picture proof.').trim() };
   challenges.unshift(challenge);
   writeHikingChallenges(challenges);
   return res.status(201).json({ challenge, challenges });
@@ -391,15 +343,7 @@ app.post('/api/admin/running-challenges', async (req, res) => {
 
   const finalScanCode = String(scanCode || `RUNNING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
   const challenges = readRunningChallenges();
-  const challenge = {
-    id: crypto.randomUUID(),
-    title: String(title).trim(),
-    description: String(description).trim(),
-    points: Number(points) || 12,
-    scanCode: finalScanCode,
-    proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim()
-  };
-
+  const challenge = { id: crypto.randomUUID(), title: String(title).trim(), description: String(description).trim(), points: Number(points) || 12, scanCode: finalScanCode, proofPrompt: String(proofPrompt || 'Upload a picture proof.').trim() };
   challenges.unshift(challenge);
   writeRunningChallenges(challenges);
   return res.status(201).json({ challenge, challenges });
