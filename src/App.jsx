@@ -28,7 +28,9 @@ import {
   FileText,
   QrCode,
   MessageSquare,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  RotateCcw,
+  Image as ImageIcon
 } from 'lucide-react';
 import './App.css';
 
@@ -538,22 +540,37 @@ export default function App() {
     return { Icon: Users, background: 'rgba(11, 65, 205, 0.08)', color: '#0b41cd' };
   };
 
-  const renderStampHistory = (stampList) => {
-    if (!stampList || stampList.length === 0) return <div className="empty-state">No stamps recorded for this club yet.</div>;
+  const renderStampHistoryCard = (stampList) => {
     return (
-      <div className="stamp-list">
-        {stampList.map((stamp) => {
-          const { Icon, background, color } = getStampBadge(stamp.title);
-          return (
-            <div key={stamp.id} className="stamp-item">
-              <div className="stamp-badge" style={{ background, color }}><Icon className="stamp-badge-icon" /></div>
-              <div className="stamp-copy">
-                <div className="stamp-title-row"><span className="stamp-title">{stamp.title}</span><span className="stamp-points">+{stamp.points} pt</span></div>
-                <span className="stamp-time">{new Date(stamp.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
-              </div>
-            </div>
-          );
-        })}
+      <div className="stamp-card-container">
+        <div className="stamp-card-header">
+          <h3 className="section-title-bold">Stamp History</h3>
+          <button type="button" className="reset-history-button" onClick={() => refreshAllData()}>
+            <RotateCcw size={14} /> Reset
+          </button>
+        </div>
+
+        {!stampList || stampList.length === 0 ? (
+          <div className="empty-activity-box">No stamps recorded for this club yet.</div>
+        ) : (
+          <div className="stamp-list">
+            {stampList.map((stamp) => {
+              const { Icon, background, color } = getStampBadge(stamp.title);
+              return (
+                <div key={stamp.id} className="stamp-item-card">
+                  <div className="stamp-badge" style={{ background, color }}><Icon className="stamp-badge-icon" /></div>
+                  <div className="stamp-copy">
+                    <div className="stamp-title-row">
+                      <strong className="stamp-title">{stamp.title}</strong>
+                      <span className="stamp-pill-badge">+{stamp.points} pt</span>
+                    </div>
+                    <span className="stamp-time">{new Date(stamp.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -887,7 +904,6 @@ export default function App() {
                 </div>
               </section>
 
-              {/* NEW STAMPS PER ACTIVITY PIE CHART */}
               {renderStampsPieChart()}
             </>
           )}
@@ -1163,7 +1179,7 @@ export default function App() {
                               <strong style={{ color: '#0f172a' }}>{post.author} <small style={{ color: '#64748b' }}>({post.isAnnouncement ? 'Announcement' : 'User post'})</small></strong>
                               <div style={{ display: 'flex', gap: '0.25rem' }}>
                                 <button type="button" className="icon-button edit-button" onClick={() => { setEditingCommunityId(post.id); setEditingCommunityDraft({ message: post.message }); }}><Edit size={14} /></button>
-                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={16} /></button>
+                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={14} /></button>
                               </div>
                             </div>
                             <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
@@ -1240,15 +1256,21 @@ export default function App() {
         {/* HOME TAB */}
         {activePortalTab === 'home' && (
           <section className="home-panel">
-            <header className="passport-header" style={{ marginBottom: '1.5rem', background: '#ffffff', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+            <header className="passport-header" style={{ marginBottom: '1.5rem', background: '#ffffff', padding: '1.75rem', borderRadius: '18px', border: '1px solid #e2e8f0' }}>
               <div>
                 <p className="eyebrow" style={{ margin: 0 }}>Digital Wellness Passport</p>
                 <h1 style={{ color: '#0f172a', margin: '0.25rem 0 1rem 0', fontSize: '2.25rem', fontWeight: 800 }}>Welcome, {currentUser?.fullName || 'Participant'}</h1>
               </div>
 
-              <div className="welcome-intro" style={{ padding: '1.25rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', borderLeft: '4px solid #0b41cd' }}>
-                <p style={{ margin: 0, color: '#334155', fontSize: '1rem', lineHeight: '1.6' }}>
-                  Welcome to your <strong>Digital Wellness Passport</strong>! Track your daily workout activities, join community fitness events, and earn points across all wellness clubs. Explore your progress below and stay active!
+              <div className="welcome-intro" style={{ padding: '1.25rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', borderLeft: '4px solid #0b41cd' }}>
+                <p style={{ margin: 0, color: '#334155', fontSize: '0.98rem', lineHeight: '1.65' }}>
+                  Welcome to your <strong>Digital Wellness Passport</strong>—your ultimate ticket to leveling up your health, energy, and strength!
+                </p>
+                <p style={{ margin: '0.5rem 0', color: '#334155', fontSize: '0.98rem', lineHeight: '1.65' }}>
+                  Every workout you log, every community event you join, and every club challenge you conquer brings you one step closer to unlocking incredible rewards and becoming the best version of yourself.
+                </p>
+                <p style={{ margin: 0, color: '#0f172a', fontSize: '0.98rem', fontWeight: 700 }}>
+                  Your journey starts right now. Dive into your stats below, smash today's goals, and let’s make every move count! 🚀🔥
                 </p>
               </div>
 
@@ -1281,22 +1303,21 @@ export default function App() {
               <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Wellness Challenge Activities</h2>
             </header>
 
-            <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <section className="activity-section-wrapper">
               <main className="category-list">
                 {categories.map((category) => renderActivityCard(category, challengeStatus.isActive))}
               </main>
             </section>
 
-            <section className="challenge-panel" style={{ marginTop: '2rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Special Activities</h3></div>
-              <main className="category-list" style={{ marginTop: '1rem' }}>
+            <section className="challenge-panel" style={{ marginTop: '2rem' }}>
+              <div className="section-heading"><h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Special Activities</h3></div>
+              <main className="category-list">
                 {specialChallenges.map((challenge) => renderActivityCard(challenge, challengeStatus.isActive, true))}
               </main>
             </section>
 
-            <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Wellness Challenge Stamp History</h3></div>
-              {renderStampHistory(wellnessStamps)}
+            <section style={{ marginTop: '2rem' }}>
+              {renderStampHistoryCard(wellnessStamps)}
             </section>
           </>
         )}
@@ -1308,24 +1329,23 @@ export default function App() {
               <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Hiking Club Expeditions</h2>
             </header>
 
-            <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <section className="activity-section-wrapper">
               <main className="category-list">
                 {hikingCategories.map((category) => renderActivityCard(category, hikingStatus.isActive))}
               </main>
 
               {hikingChallenges.length > 0 && (
                 <div style={{ marginTop: '1.5rem' }}>
-                  <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Scheduled Trails & Peaks</h3></div>
-                  <main className="category-list" style={{ marginTop: '1rem' }}>
+                  <div className="section-heading"><h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Scheduled Trails & Peaks</h3></div>
+                  <main className="category-list">
                     {hikingChallenges.map((challenge) => renderActivityCard(challenge, hikingStatus.isActive, true))}
                   </main>
                 </div>
               )}
             </section>
 
-            <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Hiking Club Stamp History</h3></div>
-              {renderStampHistory(hikingStamps)}
+            <section style={{ marginTop: '2rem' }}>
+              {renderStampHistoryCard(hikingStamps)}
             </section>
           </>
         )}
@@ -1337,24 +1357,23 @@ export default function App() {
               <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Running Club Sessions</h2>
             </header>
 
-            <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <section className="activity-section-wrapper">
               <main className="category-list">
                 {runningCategories.map((category) => renderActivityCard(category, runningStatus.isActive))}
               </main>
 
               {runningChallenges.length > 0 && (
                 <div style={{ marginTop: '1.5rem' }}>
-                  <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Scheduled Running Events</h3></div>
-                  <main className="category-list" style={{ marginTop: '1rem' }}>
+                  <div className="section-heading"><h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Scheduled Running Events</h3></div>
+                  <main className="category-list">
                     {runningChallenges.map((challenge) => renderActivityCard(challenge, runningStatus.isActive, true))}
                   </main>
                 </div>
               )}
             </section>
 
-            <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-              <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Running Club Stamp History</h3></div>
-              {renderStampHistory(runningStamps)}
+            <section style={{ marginTop: '2rem' }}>
+              {renderStampHistoryCard(runningStamps)}
             </section>
           </>
         )}
@@ -1362,20 +1381,50 @@ export default function App() {
         {/* WELLNESS COMMUNITY TAB */}
         {activePortalTab === 'community' && (
           <section className="community-panel">
-            <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Wellness Community</h3></div>
-            <div className="community-composer">
-              <textarea value={communityDraft.message} onChange={(e) => setCommunityDraft((p) => ({ ...p, message: e.target.value }))} placeholder="Share an update..." />
-              <button type="button" className="primary-button small-action" onClick={handleCommunityPostSubmit}>Post update</button>
+            <div className="community-composer-card">
+              <div className="community-card-header">
+                <h3 className="section-title-bold">Wellness Community</h3>
+                <button type="button" className="secondary-button" style={{ width: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.85rem' }} onClick={() => setActivePortalTab('home')}>
+                  Return to dashboard
+                </button>
+              </div>
+              
+              <textarea
+                value={communityDraft.message}
+                onChange={(e) => setCommunityDraft((p) => ({ ...p, message: e.target.value }))}
+                placeholder="Share a progress update, encourage peers, or post a workout moment..."
+                rows={3}
+                style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none' }}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+                <label className="secondary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', margin: 0, padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}>
+                  <ImageIcon size={16} /> Add photo
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => setCommunityDraft((p) => ({ ...p, image: reader.result }));
+                      reader.readAsDataURL(file);
+                    }
+                  }} />
+                </label>
+
+                <button type="button" className="primary-button" style={{ width: 'auto', padding: '0.55rem 1.25rem', borderRadius: '10px' }} onClick={handleCommunityPostSubmit}>
+                  Post update
+                </button>
+              </div>
             </div>
+
             <div className="community-feed" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {communityPosts.map((post) => (
-                <article key={post.id} className="community-post" style={{ padding: '1rem', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <article key={post.id} className="community-post" style={{ padding: '1.25rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
                   <div className="community-post-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <strong style={{ color: '#0f172a' }}>{post.author}</strong>
                     <small style={{ color: '#64748b' }}>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : ''}</small>
                   </div>
-                  <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
-                  {post.image ? <img src={post.image} alt="Community Post" style={{ marginTop: '0.5rem', maxHeight: '220px', borderRadius: '8px', objectFit: 'cover' }} /> : null}
+                  <p style={{ margin: 0, color: '#334155', fontSize: '0.95rem', lineHeight: '1.5' }}>{post.message}</p>
+                  {post.image ? <img src={post.image} alt="Community Post" style={{ marginTop: '0.75rem', maxHeight: '280px', width: '100%', borderRadius: '12px', objectFit: 'cover' }} /> : null}
                 </article>
               ))}
             </div>
