@@ -132,7 +132,7 @@ const sanitizeUser = (user) => {
   return rest;
 };
 
-// Points set to 1 for Hiking and Running Club default check-ins
+// Default category check-ins (1 point for Hiking and Running Expeditions)
 const categoryQrConfigurations = [
   { id: 'gym', categoryId: 'gym', title: 'Gym / Solo Workout', points: 1, code: 'WELLNESS-GYM-101', scanCode: 'WELLNESS-GYM-101', isCategory: true },
   { id: 'group', categoryId: 'group', title: 'Group Fitness Class', points: 2, code: 'WELLNESS-GROUP-202', scanCode: 'WELLNESS-GROUP-202', isCategory: true },
