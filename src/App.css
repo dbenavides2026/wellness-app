@@ -28,7 +28,7 @@ body, html {
   align-items: center;
 }
 
-/* Horizontal White Navigation Card Container (Matching 2nd Picture) */
+/* Horizontal White Navigation Card Container */
 .nav-card-container {
   max-width: 1200px;
   margin: 1.5rem auto 1rem auto;
@@ -75,6 +75,243 @@ body, html {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem 2rem 1rem;
+}
+
+/* Activity Card Styling */
+.category-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.card-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.category-title-wrap {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 65, 205, 0.12);
+  color: #0b41cd;
+  flex-shrink: 0;
+}
+
+.category-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.status-pill.pending {
+  background-color: #fef2f2;
+  color: #0b41cd;
+  border: 1px solid #fee2e2;
+}
+
+.status-pill.success {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
+}
+
+.status-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Method Toggle (Scan Code vs Upload Picture) */
+.method-toggle {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.method-toggle button {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0b41cd;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.method-toggle button.active {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0b41cd;
+}
+
+/* Scan & Upload Action Area */
+.scan-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.scan-box p.scan-instruction {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 1rem;
+}
+
+.scan-box p.scan-subtext {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 0.85rem;
+}
+
+.scan-camera-button {
+  background-color: #0b41cd;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.85rem 1.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 10px rgba(11, 65, 205, 0.25);
+}
+
+.upload-box {
+  display: block;
+  margin-bottom: 1.25rem;
+}
+
+.upload-box input {
+  display: none;
+}
+
+.upload-hint {
+  display: block;
+  text-align: center;
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  color: #64748b;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.log-button {
+  width: 100%;
+  background-color: #818cf8;
+  color: #ffffff;
+  border: none;
+  padding: 0.95rem;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.log-button:not(:disabled) {
+  background-color: #0b41cd;
+  box-shadow: 0 4px 12px rgba(11, 65, 205, 0.25);
+}
+
+.log-button:disabled {
+  background-color: #94a3b8;
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+/* Stamp History List */
+.stamp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.stamp-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.stamp-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stamp-badge-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.stamp-copy {
+  flex: 1;
+}
+
+.stamp-title-row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.stamp-points {
+  color: #15803d;
+}
+
+.stamp-time {
+  font-size: 0.8rem;
+  color: #64748b;
 }
 
 /* Authentication Screen */
@@ -306,6 +543,48 @@ body, html {
 .bar-fill {
   background: #0b41cd;
   height: 100%;
+}
+
+/* Modals */
+.scanner-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 1rem;
+}
+
+.scanner-card {
+  background: #000000;
+  padding: 1rem;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.scanner-video {
+  width: 100%;
+  max-height: 380px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.close-scanner {
+  background: #ffffff;
+  color: #0f172a;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
 }
 
 /* Mobile Responsiveness */
