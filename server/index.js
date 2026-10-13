@@ -16,29 +16,62 @@ app.use(express.json({ limit: '10mb' }));
 const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
 const superadminPasswordHash = bcrypt.hashSync('WellnessDigit@l*2026', 10);
 
-// Base de datos en memoria
-let participants = [
-  {
-    id: 'superadmin-1',
-    fullName: 'Super Administrator',
-    email: SUPERADMIN_EMAIL,
-    passwordHash: superadminPasswordHash,
-    role: 'admin',
-    stamps: []
+// Ruta del archivo de persistencia JSON
+const DB_FILE = path.join(__dirname, 'db.json');
+
+// Estructura por defecto de la base de datos
+const defaultDb = {
+  participants: [
+    {
+      id: 'superadmin-1',
+      fullName: 'Super Administrator',
+      email: SUPERADMIN_EMAIL,
+      passwordHash: superadminPasswordHash,
+      role: 'admin',
+      stamps: []
+    }
+  ],
+  specialChallenges: [],
+  hikingChallenges: [],
+  runningChallenges: [],
+  challengeStatus: { isActive: true, title: 'Active Wellness Challenge Campaign', startDate: new Date().toISOString(), endDate: '' },
+  hikingStatus: { isActive: true, title: 'Active Hiking Season Campaign', startDate: new Date().toISOString(), endDate: '' },
+  runningStatus: { isActive: true, title: 'Active Running Season Campaign', startDate: new Date().toISOString(), endDate: '' },
+  communityPosts: [
+    { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, createdAt: new Date().toISOString() }
+  ]
+};
+
+// Función para cargar los datos desde el archivo local
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const data = fs.readFileSync(DB_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      
+      // Asegurar que el superadmin siempre exista
+      if (!parsed.participants.some(p => p.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase())) {
+        parsed.participants.unshift(defaultDb.participants[0]);
+      }
+      return parsed;
+    }
+  } catch (err) {
+    console.error('Error al leer db.json, usando base de datos por defecto:', err);
   }
-];
+  return defaultDb;
+}
 
-let specialChallenges = [];
-let hikingChallenges = [];
-let runningChallenges = [];
+// Inicialización de la base de datos en memoria cargando desde archivo
+let db = loadDatabase();
 
-let challengeStatus = { isActive: true, title: 'Active Wellness Challenge Campaign', startDate: new Date().toISOString(), endDate: '' };
-let hikingStatus = { isActive: true, title: 'Active Hiking Season Campaign', startDate: new Date().toISOString(), endDate: '' };
-let runningStatus = { isActive: true, title: 'Active Running Season Campaign', startDate: new Date().toISOString(), endDate: '' };
-
-let communityPosts = [
-  { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, createdAt: new Date().toISOString() }
-];
+// Función para guardar los cambios en el archivo db.json
+function saveDatabase() {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error al guardar en db.json:', err);
+  }
+}
 
 // Validador de política de contraseñas
 function validatePasswordPolicy(password) {
@@ -55,14 +88,12 @@ function validatePasswordPolicy(password) {
   return null;
 }
 
-// Generador de QR ultra-confiable (Data URL SVG puro)
+// Generador de QR
 async function generateQrDataUrl(codeText) {
   try {
     const svgString = await QRCode.toString(codeText, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' });
     return `data:image/svg+xml;utf8,${encodeURIComponent(svgString)}`;
   } catch (err) {
-    console.error(`Error generando QR para ${codeText}:`, err);
-    // Fallback con imagen SVG embebida directa
     const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180"><rect width="100%" height="100%" fill="#f1f5f9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0b41cd">${codeText}</text></svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
   }
@@ -79,14 +110,14 @@ async function getQrCodeCatalog() {
   ];
 
   const specialItems = [
-    ...specialChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `WELLNESS-SPEC-${c.id.slice(-4)}` })),
-    ...hikingChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `HIKING-SPEC-${c.id.slice(-4)}` })),
-    ...runningChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `RUNNING-SPEC-${c.id.slice(-4)}` }))
+    ...db.specialChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `WELLNESS-SPEC-${c.id.slice(-4)}` })),
+    ...db.hikingChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `HIKING-SPEC-${c.id.slice(-4)}` })),
+    ...db.runningChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `RUNNING-SPEC-${c.id.slice(-4)}` }))
   ];
 
   const allItems = [...baseItems, ...specialItems];
 
-  const catalog = await Promise.all(
+  return Promise.all(
     allItems.map(async (item) => {
       const code = item.code || 'WELLNESS-DEFAULT';
       const qrCode = await generateQrDataUrl(code);
@@ -99,14 +130,13 @@ async function getQrCodeCatalog() {
       };
     })
   );
-
-  return catalog;
 }
 
-// Rutas de API
+// --- Rutas de API ---
+
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
+  const user = db.participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
   if (!user) return res.status(401).json({ message: 'Invalid email or password.' });
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
@@ -119,14 +149,16 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { fullName, email, password } = req.body;
   if (!fullName || !email || !password) return res.status(400).json({ message: 'All fields are required.' });
-  if (participants.some(p => p.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ message: 'Email already registered.' });
+  if (db.participants.some(p => p.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ message: 'Email already registered.' });
 
   const policyError = validatePasswordPolicy(password);
   if (policyError) return res.status(400).json({ message: policyError });
 
   const passwordHash = await bcrypt.hash(password, 10);
   const newUser = { id: String(Date.now()), fullName, email: email.toLowerCase(), passwordHash, role: 'participant', stamps: [] };
-  participants.push(newUser);
+  
+  db.participants.push(newUser);
+  saveDatabase();
 
   const { passwordHash: _, ...userPayload } = newUser;
   res.status(201).json({ user: userPayload });
@@ -134,7 +166,7 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/admin/login', async (req, res) => {
   const { email, password } = req.body;
-  const admin = participants.find(p => p.role === 'admin' && p.email.toLowerCase() === (email || '').toLowerCase());
+  const admin = db.participants.find(p => p.role === 'admin' && p.email.toLowerCase() === (email || '').toLowerCase());
   if (!admin) return res.status(401).json({ message: 'Invalid admin credentials.' });
 
   const isMatch = await bcrypt.compare(password, admin.passwordHash);
@@ -145,7 +177,7 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 app.get('/api/participants', (req, res) => {
-  const safeParticipants = participants.map(({ passwordHash, ...p }) => p);
+  const safeParticipants = db.participants.map(({ passwordHash, ...p }) => p);
   res.json({ participants: safeParticipants });
 });
 
@@ -153,11 +185,13 @@ app.post('/api/participants/:id/stamps', (req, res) => {
   const { id } = req.params;
   const { title, points, categoryId, scanCode } = req.body;
 
-  const user = participants.find(p => p.id === id);
+  const user = db.participants.find(p => p.id === id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
 
   const newStamp = { id: String(Date.now()), title, points: Number(points) || 1, categoryId: categoryId || 'general', scanCode, date: new Date().toISOString() };
   user.stamps = [newStamp, ...(user.stamps || [])];
+
+  saveDatabase();
 
   const { passwordHash, ...userPayload } = user;
   res.json({ user: userPayload });
@@ -167,7 +201,7 @@ app.put('/api/participants/:id/profile', async (req, res) => {
   const { id } = req.params;
   const { fullName, email, password, profileImage } = req.body;
 
-  const user = participants.find(p => p.id === id);
+  const user = db.participants.find(p => p.id === id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
 
   if (fullName) user.fullName = fullName;
@@ -179,111 +213,128 @@ app.put('/api/participants/:id/profile', async (req, res) => {
   }
   if (profileImage !== undefined) user.profileImage = profileImage;
 
+  saveDatabase();
+
   const { passwordHash, ...userPayload } = user;
   res.json({ user: userPayload });
 });
 
-// Desafíos y Campañas
-app.get('/api/challenges', (req, res) => res.json({ challenges: specialChallenges }));
-app.get('/api/hiking-challenges', (req, res) => res.json({ challenges: hikingChallenges }));
-app.get('/api/running-challenges', (req, res) => res.json({ challenges: runningChallenges }));
+// --- Desafíos y Campañas ---
+app.get('/api/challenges', (req, res) => res.json({ challenges: db.specialChallenges }));
+app.get('/api/hiking-challenges', (req, res) => res.json({ challenges: db.hikingChallenges }));
+app.get('/api/running-challenges', (req, res) => res.json({ challenges: db.runningChallenges }));
 
-app.get('/api/admin/challenge-status', (req, res) => res.json({ status: challengeStatus }));
-app.get('/api/admin/hiking-status', (req, res) => res.json({ status: hikingStatus }));
-app.get('/api/admin/running-status', (req, res) => res.json({ status: runningStatus }));
+app.get('/api/admin/challenge-status', (req, res) => res.json({ status: db.challengeStatus }));
+app.get('/api/admin/hiking-status', (req, res) => res.json({ status: db.hikingStatus }));
+app.get('/api/admin/running-status', (req, res) => res.json({ status: db.runningStatus }));
 
 app.post('/api/admin/challenge-status/start', (req, res) => {
   const { startDate, endDate } = req.body;
-  challengeStatus = { isActive: true, title: 'Active Wellness Challenge Campaign', startDate: startDate || new Date().toISOString(), endDate: endDate || '' };
-  res.json({ status: challengeStatus });
+  db.challengeStatus = { isActive: true, title: 'Active Wellness Challenge Campaign', startDate: startDate || new Date().toISOString(), endDate: endDate || '' };
+  saveDatabase();
+  res.json({ status: db.challengeStatus });
 });
 
 app.post('/api/admin/challenge-status/end', (req, res) => {
-  challengeStatus = { isActive: false, title: 'Wellness Challenge Campaign Ended' };
-  participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => s.scanCode?.startsWith('HIKING-') || s.scanCode?.startsWith('RUNNING-')) : []; });
-  res.json({ status: challengeStatus });
+  db.challengeStatus = { isActive: false, title: 'Wellness Challenge Campaign Ended' };
+  db.participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => s.scanCode?.startsWith('HIKING-') || s.scanCode?.startsWith('RUNNING-')) : []; });
+  saveDatabase();
+  res.json({ status: db.challengeStatus });
 });
 
 app.post('/api/admin/hiking-status/start', (req, res) => {
   const { startDate, endDate } = req.body;
-  hikingStatus = { isActive: true, title: 'Active Hiking Season Campaign', startDate: startDate || new Date().toISOString(), endDate: endDate || '' };
-  res.json({ status: hikingStatus });
+  db.hikingStatus = { isActive: true, title: 'Active Hiking Season Campaign', startDate: startDate || new Date().toISOString(), endDate: endDate || '' };
+  saveDatabase();
+  res.json({ status: db.hikingStatus });
 });
 
 app.post('/api/admin/hiking-status/end', (req, res) => {
-  hikingStatus = { isActive: false, title: 'Hiking Season Ended' };
-  participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => !s.scanCode?.startsWith('HIKING-')) : []; });
-  res.json({ status: hikingStatus });
+  db.hikingStatus = { isActive: false, title: 'Hiking Season Ended' };
+  db.participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => !s.scanCode?.startsWith('HIKING-')) : []; });
+  saveDatabase();
+  res.json({ status: db.hikingStatus });
 });
 
 app.post('/api/admin/running-status/start', (req, res) => {
   const { startDate, endDate } = req.body;
-  runningStatus = { isActive: true, title: 'Active Running Season Campaign', startDate: startDate || new Date().toISOString(), endDate: endDate || '' };
-  res.json({ status: runningStatus });
+  db.runningStatus = { isActive: true, title: 'Active Running Season Campaign', startDate: startDate || new Date().toISOString(), endDate: endDate || '' };
+  saveDatabase();
+  res.json({ status: db.runningStatus });
 });
 
 app.post('/api/admin/running-status/end', (req, res) => {
-  runningStatus = { isActive: false, title: 'Running Season Ended' };
-  participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => !s.scanCode?.startsWith('RUNNING-')) : []; });
-  res.json({ status: runningStatus });
+  db.runningStatus = { isActive: false, title: 'Running Season Ended' };
+  db.participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => !s.scanCode?.startsWith('RUNNING-')) : []; });
+  saveDatabase();
+  res.json({ status: db.runningStatus });
 });
 
 app.post('/api/admin/challenges', (req, res) => {
   const { title, description, points, eventDate } = req.body;
   const newCh = { id: String(Date.now()), title, description, points: Number(points) || 10, eventDate: eventDate || '', scanCode: `WELLNESS-SPEC-${Date.now().toString().slice(-4)}` };
-  specialChallenges.push(newCh);
+  db.specialChallenges.push(newCh);
+  saveDatabase();
   res.status(201).json({ challenge: newCh });
 });
 
 app.delete('/api/admin/challenges/:id', (req, res) => {
-  specialChallenges = specialChallenges.filter(c => c.id !== req.params.id);
+  db.specialChallenges = db.specialChallenges.filter(c => c.id !== req.params.id);
+  saveDatabase();
   res.json({ message: 'Deleted' });
 });
 
 app.post('/api/admin/hiking-challenges', (req, res) => {
   const { title, description, points, eventDate } = req.body;
   const newCh = { id: String(Date.now()), title, description, points: Number(points) || 15, eventDate: eventDate || '', scanCode: `HIKING-SPEC-${Date.now().toString().slice(-4)}` };
-  hikingChallenges.push(newCh);
+  db.hikingChallenges.push(newCh);
+  saveDatabase();
   res.status(201).json({ challenge: newCh });
 });
 
 app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
-  hikingChallenges = hikingChallenges.filter(c => c.id !== req.params.id);
+  db.hikingChallenges = db.hikingChallenges.filter(c => c.id !== req.params.id);
+  saveDatabase();
   res.json({ message: 'Deleted' });
 });
 
 app.post('/api/admin/running-challenges', (req, res) => {
   const { title, description, points, eventDate } = req.body;
   const newCh = { id: String(Date.now()), title, description, points: Number(points) || 12, eventDate: eventDate || '', scanCode: `RUNNING-SPEC-${Date.now().toString().slice(-4)}` };
-  runningChallenges.push(newCh);
+  db.runningChallenges.push(newCh);
+  saveDatabase();
   res.status(201).json({ challenge: newCh });
 });
 
 app.delete('/api/admin/running-challenges/:id', (req, res) => {
-  runningChallenges = runningChallenges.filter(c => c.id !== req.params.id);
+  db.runningChallenges = db.runningChallenges.filter(c => c.id !== req.params.id);
+  saveDatabase();
   res.json({ message: 'Deleted' });
 });
 
-// Comunidad
-app.get('/api/admin/community', (req, res) => res.json({ posts: communityPosts }));
+// --- Comunidad ---
+app.get('/api/admin/community', (req, res) => res.json({ posts: db.communityPosts }));
+
 app.post('/api/admin/community', (req, res) => {
   const { author, role, message, image, isAnnouncement } = req.body;
   const newPost = { id: String(Date.now()), author, role: role || 'participant', message: message || '', image: image || '', isAnnouncement: Boolean(isAnnouncement), createdAt: new Date().toISOString() };
-  communityPosts = [newPost, ...communityPosts];
+  db.communityPosts = [newPost, ...db.communityPosts];
+  saveDatabase();
   res.status(201).json({ post: newPost });
 });
 
 app.delete('/api/admin/community/:id', (req, res) => {
-  communityPosts = communityPosts.filter(p => p.id !== req.params.id);
+  db.communityPosts = db.communityPosts.filter(p => p.id !== req.params.id);
+  saveDatabase();
   res.json({ message: 'Deleted' });
 });
 
-// Estadísticas y Catálogo QR
+// --- Estadísticas y Catálogo QR ---
 app.get('/api/admin/stats', (req, res) => {
-  const totalParticipants = participants.length;
-  const activeParticipants = participants.filter(p => (p.stamps || []).length > 0).length;
-  const totalStamps = participants.reduce((sum, p) => sum + (p.stamps || []).length, 0);
-  const totalPoints = participants.reduce((sum, p) => sum + (p.stamps || []).reduce((s, st) => s + Number(st.points || 0), 0), 0);
+  const totalParticipants = db.participants.length;
+  const activeParticipants = db.participants.filter(p => (p.stamps || []).length > 0).length;
+  const totalStamps = db.participants.reduce((sum, p) => sum + (p.stamps || []).length, 0);
+  const totalPoints = db.participants.reduce((sum, p) => sum + (p.stamps || []).reduce((s, st) => s + Number(st.points || 0), 0), 0);
 
   res.json({ stats: { totalParticipants, activeParticipants, totalStamps, totalPoints } });
 });
@@ -299,18 +350,20 @@ app.get('/api/admin/qr-codes', async (req, res) => {
 });
 
 app.post('/api/admin/participants/:id/promote', (req, res) => {
-  const user = participants.find(p => p.id === req.params.id);
+  const user = db.participants.find(p => p.id === req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
   user.role = 'admin';
+  saveDatabase();
   res.json({ message: `${user.fullName} is now an admin.` });
 });
 
 app.delete('/api/admin/participants/:id', (req, res) => {
-  participants = participants.filter(p => p.id !== req.params.id);
+  db.participants = db.participants.filter(p => p.id !== req.params.id);
+  saveDatabase();
   res.json({ message: 'User deleted.' });
 });
 
-// Archivos Estáticos de Producción
+// Servir archivos estáticos del frontend
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
