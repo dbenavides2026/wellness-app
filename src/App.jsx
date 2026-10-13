@@ -68,6 +68,7 @@ export default function App() {
   const [participants, setParticipants] = useState([]);
   const [adminStats, setAdminStats] = useState({ stats: {}, recentActivity: [] });
   const [adminQrCodes, setAdminQrCodes] = useState([]);
+  const [qrLoading, setQrLoading] = useState(false);
   const [adminReport, setAdminReport] = useState([]);
   const [reportCategory, setReportCategory] = useState('all');
   const [adminCommunityPosts, setAdminCommunityPosts] = useState([]);
@@ -186,16 +187,39 @@ export default function App() {
     }
   };
 
+  const fetchAdminQrCodes = async () => {
+    setQrLoading(true);
+    try {
+      const t = Date.now();
+      const qrs = await fetchJson(`/api/admin/qr-codes?t=${t}`);
+      setAdminQrCodes(qrs.qrCodes || []);
+    } catch (e) {
+      console.error('Admin QR fetch error', e);
+      // Fallback local list if API fails
+      const fallbackList = [
+        { id: 'gym', title: 'Gym / Solo Workout', scanCode: 'WELLNESS-GYM-101' },
+        { id: 'group', title: 'Group Fitness Class', scanCode: 'WELLNESS-GROUP-202' },
+        { id: 'sports', title: 'Sports & Outdoor Game', scanCode: 'WELLNESS-SPORTS-303' },
+        { id: 'hiking-club-checkin', title: 'Hiking Club Expedition', scanCode: 'HIKING-CLUB-101' },
+        { id: 'running-club-checkin', title: 'Running Club Session', scanCode: 'RUNNING-CLUB-101' },
+        ...specialChallenges.map(c => ({ id: c.id, title: c.title, scanCode: c.scanCode })),
+        ...hikingChallenges.map(c => ({ id: c.id, title: c.title, scanCode: c.scanCode })),
+        ...runningChallenges.map(c => ({ id: c.id, title: c.title, scanCode: c.scanCode }))
+      ];
+      setAdminQrCodes(fallbackList);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
   const refreshAdminData = async () => {
     try {
       const t = Date.now();
-      const [stats, qrs, rep] = await Promise.all([
+      const [stats, rep] = await Promise.all([
         fetchJson(`/api/admin/stats?t=${t}`),
-        fetchJson(`/api/admin/qr-codes?t=${t}`),
         fetchJson(`/api/admin/report?t=${t}`)
       ]);
       setAdminStats(stats || { stats: {}, recentActivity: [] });
-      setAdminQrCodes(qrs.qrCodes || []);
       setAdminReport(rep.report || []);
     } catch (e) {
       console.error('Admin data error', e);
@@ -204,29 +228,24 @@ export default function App() {
 
   useEffect(() => {
     refreshAllData();
+    if (adminUser || screen === 'admin-dashboard') {
+      refreshAdminData();
+      if (adminTab === 'qr') fetchAdminQrCodes();
+    }
+
     const interval = setInterval(() => {
       refreshAllData();
-      if (adminUser) refreshAdminData();
+      if (adminUser || screen === 'admin-dashboard') refreshAdminData();
     }, 5000);
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshAllData();
-        if (adminUser) refreshAdminData();
-      }
-    };
+    return () => clearInterval(interval);
+  }, [currentUser?.id, adminUser?.id, screen]);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
-    };
-  }, [currentUser?.id, adminUser?.id]);
-
-  useEffect(() => { if (adminUser) refreshAdminData(); }, [adminUser]);
+  useEffect(() => {
+    if (adminTab === 'qr') {
+      fetchAdminQrCodes();
+    }
+  }, [adminTab, specialChallenges.length, hikingChallenges.length, runningChallenges.length]);
 
   useEffect(() => {
     if (currentUser) {
@@ -401,7 +420,7 @@ export default function App() {
     if (!window.confirm('Delete this special activity?')) return;
     try {
       await fetchJson(`/api/admin/challenges/${id}`, { method: 'DELETE' });
-      setAdminMessage('Special activity deleted.'); await refreshAllData(); await refreshAdminData();
+      setAdminMessage('Special activity deleted.'); await refreshAllData(); await refreshAdminData(); fetchAdminQrCodes();
     } catch (error) { setAdminMessage(error.message || 'Unable to delete activity.'); }
   };
 
@@ -409,7 +428,7 @@ export default function App() {
     if (!window.confirm('Delete this hiking activity?')) return;
     try {
       await fetchJson(`/api/admin/hiking-challenges/${id}`, { method: 'DELETE' });
-      setAdminMessage('Hiking activity deleted.'); await refreshAllData(); await refreshAdminData();
+      setAdminMessage('Hiking activity deleted.'); await refreshAllData(); await refreshAdminData(); fetchAdminQrCodes();
     } catch (error) { setAdminMessage(error.message || 'Unable to delete activity.'); }
   };
 
@@ -417,7 +436,7 @@ export default function App() {
     if (!window.confirm('Delete this running activity?')) return;
     try {
       await fetchJson(`/api/admin/running-challenges/${id}`, { method: 'DELETE' });
-      setAdminMessage('Running activity deleted.'); await refreshAllData(); await refreshAdminData();
+      setAdminMessage('Running activity deleted.'); await refreshAllData(); await refreshAdminData(); fetchAdminQrCodes();
     } catch (error) { setAdminMessage(error.message || 'Unable to delete activity.'); }
   };
 
@@ -471,7 +490,7 @@ export default function App() {
     if (!title || !description) { setAdminMessage('Activity name and description are required.'); return; }
     try {
       await fetchJson('/api/admin/challenges', { method: 'POST', body: JSON.stringify({ ...challengeForm, points: Number(challengeForm.points) || 10 }) });
-      setChallengeForm({ title: '', description: '', points: 10, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Special activity saved successfully.'); await refreshAllData(); await refreshAdminData();
+      setChallengeForm({ title: '', description: '', points: 10, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Special activity saved successfully.'); await refreshAllData(); await refreshAdminData(); fetchAdminQrCodes();
     } catch (error) { setAdminMessage(error.message || 'Unable to save activity.'); }
   };
 
@@ -480,7 +499,7 @@ export default function App() {
     if (!title || !description) { setAdminMessage('Hiking title and description are required.'); return; }
     try {
       await fetchJson('/api/admin/hiking-challenges', { method: 'POST', body: JSON.stringify({ ...hikingForm, points: Number(hikingForm.points) || 15 }) });
-      setHikingForm({ title: '', description: '', points: 15, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Hiking activity saved successfully.'); await refreshAllData(); await refreshAdminData();
+      setHikingForm({ title: '', description: '', points: 15, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Hiking activity saved successfully.'); await refreshAllData(); await refreshAdminData(); fetchAdminQrCodes();
     } catch (error) { setAdminMessage(error.message || 'Unable to save hiking activity.'); }
   };
 
@@ -489,7 +508,7 @@ export default function App() {
     if (!title || !description) { setAdminMessage('Running title and description are required.'); return; }
     try {
       await fetchJson('/api/admin/running-challenges', { method: 'POST', body: JSON.stringify({ ...runningForm, points: Number(runningForm.points) || 12 }) });
-      setRunningForm({ title: '', description: '', points: 12, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Running activity saved successfully.'); await refreshAllData(); await refreshAdminData();
+      setRunningForm({ title: '', description: '', points: 12, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Running activity saved successfully.'); await refreshAllData(); await refreshAdminData(); fetchAdminQrCodes();
     } catch (error) { setAdminMessage(error.message || 'Unable to save running activity.'); }
   };
 
@@ -1005,6 +1024,18 @@ export default function App() {
       ? (s) => s.scanCode?.startsWith('RUNNING-')
       : () => true;
 
+    // Direct inline QR list fallback for catalog display
+    const currentCatalogQrs = adminQrCodes.length > 0 ? adminQrCodes : [
+      { id: 'gym', title: 'Gym / Solo Workout', scanCode: 'WELLNESS-GYM-101' },
+      { id: 'group', title: 'Group Fitness Class', scanCode: 'WELLNESS-GROUP-202' },
+      { id: 'sports', title: 'Sports & Outdoor Game', scanCode: 'WELLNESS-SPORTS-303' },
+      { id: 'hiking-club-checkin', title: 'Hiking Club Expedition', scanCode: 'HIKING-CLUB-101' },
+      { id: 'running-club-checkin', title: 'Running Club Session', scanCode: 'RUNNING-CLUB-101' },
+      ...specialChallenges.map(c => ({ id: c.id, title: c.title, scanCode: c.scanCode })),
+      ...hikingChallenges.map(c => ({ id: c.id, title: c.title, scanCode: c.scanCode })),
+      ...runningChallenges.map(c => ({ id: c.id, title: c.title, scanCode: c.scanCode }))
+    ];
+
     return (
       <div className="admin-app">
         <header className="admin-header">
@@ -1412,28 +1443,29 @@ export default function App() {
             </section>
           )}
 
-         {adminTab === 'qr' && (
-  <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-    <h3 style={{ color: '#0f172a' }}>Category & Activity QR Codes</h3>
-    <div className="qr-grid qr-sheet-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
-      {adminQrCodes.length === 0 ? (
-        <div className="empty-state" style={{ width: '100%', textAlign: 'center', gridColumn: '1 / -1', padding: '2rem' }}>Loading QR codes catalog…</div>
-      ) : (
-        adminQrCodes.map((item) => (
-          <div key={item.id || item.code} className="qr-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            {item.qrCode ? (
-              <img src={item.qrCode} alt={item.title} className="qr-image" style={{ width: '100%', maxWidth: '180px', height: 'auto', borderRadius: '8px' }} />
-            ) : (
-              <div style={{ width: '180px', height: '180px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#94a3b8' }}>Generating QR…</div>
-            )}
-            <strong style={{ display: 'block', margin: '0.75rem 0 0.25rem 0', color: '#0f172a', fontSize: '0.95rem' }}>{item.title}</strong>
-            <small style={{ color: '#0b41cd', fontWeight: 'bold', fontFamily: 'monospace' }}>{item.scanCode || item.code}</small>
-          </div>
-        ))
-      )}
-    </div>
-  </section>
-)}
+          {adminTab === 'qr' && (
+            <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+              <h3 style={{ color: '#0f172a' }}>Category & Activity QR Codes</h3>
+              <div className="qr-grid qr-sheet-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
+                {qrLoading && currentCatalogQrs.length === 0 ? (
+                  <div className="empty-state" style={{ width: '100%', textAlign: 'center', gridColumn: '1 / -1', padding: '2rem' }}>Loading QR codes catalog…</div>
+                ) : (
+                  currentCatalogQrs.map((item) => {
+                    const codeVal = item.scanCode || item.code || 'WELLNESS-DEFAULT';
+                    const qrImg = item.qrCode || `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180"><rect width="100%" height="100%" fill="#eff6ff"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="bold" fill="#0b41cd">${codeVal}</text></svg>`)}`;
+
+                    return (
+                      <div key={item.id || codeVal} className="qr-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                        <img src={qrImg} alt={item.title} className="qr-image" style={{ width: '100%', maxWidth: '180px', height: '180px', borderRadius: '8px', objectFit: 'contain' }} />
+                        <strong style={{ display: 'block', margin: '0.75rem 0 0.25rem 0', color: '#0f172a', fontSize: '0.95rem' }}>{item.title}</strong>
+                        <small style={{ color: '#0b41cd', fontWeight: 'bold', fontFamily: 'monospace' }}>{codeVal}</small>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          )}
         </main>
       </div>
     );
