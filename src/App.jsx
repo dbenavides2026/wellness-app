@@ -77,7 +77,14 @@ export default function App() {
 
   const [communityPosts, setCommunityPosts] = useState([]);
   const [communityDraft, setCommunityDraft] = useState({ message: '', image: '' });
-  const [screen, setScreen] = useState('login');
+  
+  const [screen, setScreen] = useState(() => {
+    try {
+      if (window.localStorage.getItem(CURRENT_USER_KEY)) return 'dashboard';
+      if (window.localStorage.getItem(ADMIN_USER_KEY)) return 'admin-dashboard';
+    } catch { }
+    return 'login';
+  });
 
   const [currentUser, setCurrentUser] = useState(() => {
     try { return JSON.parse(window.localStorage.getItem(CURRENT_USER_KEY)) || null; } catch { return null; }
@@ -170,7 +177,9 @@ export default function App() {
 
       if (currentUser?.id) {
         const freshUser = updatedParticipants.find((p) => p.id === currentUser.id);
-        if (freshUser) setCurrentUser(freshUser);
+        if (freshUser) {
+          setCurrentUser(prev => JSON.stringify(prev) === JSON.stringify(freshUser) ? prev : freshUser);
+        }
       }
     } catch (e) {
       console.error('Data refresh error', e);
@@ -230,11 +239,6 @@ export default function App() {
     if (adminUser) window.localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(adminUser));
     else window.localStorage.removeItem(ADMIN_USER_KEY);
   }, [adminUser]);
-
-  useEffect(() => {
-    if (currentUser && (screen === 'login' || screen === 'register')) setScreen('dashboard');
-    if (adminUser && (screen === 'login' || screen === 'register' || screen === 'admin-login')) setScreen('admin-dashboard');
-  }, [currentUser, adminUser, screen]);
 
   const addStampWithCode = async (activity, directCode = '') => {
     if (!currentUser) return;
