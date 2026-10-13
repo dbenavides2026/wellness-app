@@ -77,6 +77,128 @@ body, html {
   padding: 0 1rem 2rem 1rem;
 }
 
+/* Section Card Containers (Matching Special Activities & Stamp History) */
+.section-card-container,
+.stamp-card-container,
+.community-composer-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.section-card-header,
+.stamp-card-header,
+.community-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.section-title-bold {
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #0f172a;
+}
+
+/* Interactive Calendar Styles */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #64748b;
+  padding-bottom: 0.5rem;
+}
+
+.calendar-day {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  min-height: 80px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.calendar-day.today {
+  border-color: #0b41cd;
+  background: #eff6ff;
+}
+
+.calendar-day.empty {
+  background: transparent;
+  border: none;
+}
+
+.calendar-date-number {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.calendar-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.calendar-event-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* Stamp History Styling */
+.stamp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.stamp-item-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.stamp-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.stamp-pill-badge {
+  background: #eff6ff;
+  color: #0b41cd;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 10px;
+}
+
 /* Admin Campaign Banner Card */
 .campaign-status-card {
   background: #ffffff;
@@ -513,6 +635,19 @@ body, html {
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
+  .calendar-grid {
+    gap: 0.25rem;
+  }
+
+  .calendar-day {
+    min-height: 60px;
+    padding: 0.25rem;
+  }
+
+  .calendar-event-pill {
+    font-size: 0.55rem;
+  }
+
   .campaign-status-card {
     flex-direction: column;
     align-items: flex-start;
