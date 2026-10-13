@@ -564,11 +564,17 @@ app.get('/api/admin/report/csv', (_req, res) => {
   return res.send(csv);
 });
 
+// Servir cliente de React en Express con encabezados Anti-Cache para HTML
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
+
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      // Force mobile browsers to revalidate index.html on every app launch
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       return res.sendFile(path.join(distPath, 'index.html'));
     }
     next();
