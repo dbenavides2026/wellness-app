@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import QRCode from 'qrcode';
+import bcrypt from 'bcryptjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,10 +13,20 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json({ limit: '10mb' }));
 
-// In-Memory Data Storage
+// Default hashed password for superadmin (Pre-hashed with bcrypt cost factor 10)
+// Original Default: "AdminPass123!" -> Hashed below
+const DEFAULT_SUPERADMIN_HASH = '$2a$10$e7mK8Z6O/.OaC8v6XjYVUO5E.eH.5rS0V.y2I1b0l3E0s4g1e0V2a';
+
+// In-Memory Data Storage (No plain-text credentials stored)
 let participants = [
-  { id: '1', fullName: 'Daniel Benavides', email: 'dbenavides2026@gmail.com', password: 'password123', role: 'participant', stamps: [] },
-  { id: '2', fullName: 'Admin User', email: 'admin@wellness.com', password: 'adminpassword', role: 'admin', stamps: [] }
+  {
+    id: 'admin-1',
+    fullName: 'System Administrator',
+    email: process.env.SUPERADMIN_EMAIL || 'admin@wellness.com',
+    passwordHash: process.env.SUPERADMIN_PASSWORD_HASH || DEFAULT_SUPERADMIN_HASH,
+    role: 'admin',
+    stamps: []
+  }
 ];
 
 let specialChallenges = [];
@@ -29,6 +40,29 @@ let runningStatus = { isActive: true, title: 'Active Running Season Campaign', s
 let communityPosts = [
   { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, createdAt: new Date().toISOString() }
 ];
+
+// Helper: Password Policy Validator
+function validatePasswordPolicy(password) {
+  const minLength = 8;
+  const maxLength = 16;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+  if (password.length < minLength || password.length > maxLength) {
+    return 'Password must be between 8 and 16 characters.';
+  }
+  if (!hasUppercase) {
+    return 'Password must contain at least one uppercase letter.';
+  }
+  if (!hasNumber) {
+    return 'Password must contain at least one number.';
+  }
+  if (!hasSpecial) {
+    return 'Password must contain at least one special character (!@#$%^&*...).';
+  }
+  return null;
+}
 
 // QR Catalog Generator
 async function getQrCodeCatalog() {
@@ -54,31 +88,50 @@ async function getQrCodeCatalog() {
 }
 
 // API Routes
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase() && p.password === password);
+  const user = participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
   if (!user) return res.status(401).json({ message: 'Invalid email or password.' });
-  res.json({ user });
+
+  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatch) return res.status(401).json({ message: 'Invalid email or password.' });
+
+  const { passwordHash, ...userPayload } = user;
+  res.json({ user: userPayload });
 });
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { fullName, email, password } = req.body;
   if (!fullName || !email || !password) return res.status(400).json({ message: 'All fields are required.' });
   if (participants.some(p => p.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ message: 'Email already registered.' });
 
-  const newUser = { id: String(Date.now()), fullName, email: email.toLowerCase(), password, role: 'participant', stamps: [] };
+  const policyError = validatePasswordPolicy(password);
+  if (policyError) return res.status(400).json({ message: policyError });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const newUser = { id: String(Date.now()), fullName, email: email.toLowerCase(), passwordHash, role: 'participant', stamps: [] };
   participants.push(newUser);
-  res.status(201).json({ user: newUser });
+
+  const { passwordHash: _, ...userPayload } = newUser;
+  res.status(201).json({ user: userPayload });
 });
 
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
   const { email, password } = req.body;
-  const admin = participants.find(p => p.role === 'admin' && p.email.toLowerCase() === (email || '').toLowerCase() && p.password === password);
+  const admin = participants.find(p => p.role === 'admin' && p.email.toLowerCase() === (email || '').toLowerCase());
   if (!admin) return res.status(401).json({ message: 'Invalid admin credentials.' });
-  res.json({ user: admin });
+
+  const isMatch = await bcrypt.compare(password, admin.passwordHash);
+  if (!isMatch) return res.status(401).json({ message: 'Invalid admin credentials.' });
+
+  const { passwordHash, ...adminPayload } = admin;
+  res.json({ user: adminPayload });
 });
 
-app.get('/api/participants', (req, res) => res.json({ participants }));
+app.get('/api/participants', (req, res) => {
+  const safeParticipants = participants.map(({ passwordHash, ...p }) => p);
+  res.json({ participants: safeParticipants });
+});
 
 app.post('/api/participants/:id/stamps', (req, res) => {
   const { id } = req.params;
@@ -90,10 +143,11 @@ app.post('/api/participants/:id/stamps', (req, res) => {
   const newStamp = { id: String(Date.now()), title, points: Number(points) || 1, categoryId: categoryId || 'general', scanCode, date: new Date().toISOString() };
   user.stamps = [newStamp, ...(user.stamps || [])];
 
-  res.json({ user });
+  const { passwordHash, ...userPayload } = user;
+  res.json({ user: userPayload });
 });
 
-app.put('/api/participants/:id/profile', (req, res) => {
+app.put('/api/participants/:id/profile', async (req, res) => {
   const { id } = req.params;
   const { fullName, email, password, profileImage } = req.body;
 
@@ -102,10 +156,15 @@ app.put('/api/participants/:id/profile', (req, res) => {
 
   if (fullName) user.fullName = fullName;
   if (email) user.email = email.toLowerCase();
-  if (password) user.password = password;
+  if (password) {
+    const policyError = validatePasswordPolicy(password);
+    if (policyError) return res.status(400).json({ message: policyError });
+    user.passwordHash = await bcrypt.hash(password, 10);
+  }
   if (profileImage !== undefined) user.profileImage = profileImage;
 
-  res.json({ user });
+  const { passwordHash, ...userPayload } = user;
+  res.json({ user: userPayload });
 });
 
 // Campaign & Challenge Management
