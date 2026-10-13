@@ -671,14 +671,14 @@ export default function App() {
       : () => true;
 
     return (
-      <div className="admin-app" style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+      <div className="admin-app">
         <header className="admin-header" style={{ padding: '1rem 2rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><p className="eyebrow" style={{ color: '#0b41cd', fontWeight: 'bold', margin: 0 }}>Admin dashboard</p><h1 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a' }}>Wellness Passport Overview</h1></div>
           <button type="button" className="logout-button" onClick={handleAdminLogout}><LogOut className="button-icon" /> Log out</button>
         </header>
 
-        <div style={{ display: 'flex', minHeight: 'calc(100vh - 70px)' }}>
-          <aside style={{ width: '250px', background: '#ffffff', borderRight: '1px solid #e2e8f0', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', flexShrink: 0 }}>
+        <div className="portal-body">
+          <aside className="portal-sidebar">
             <button type="button" style={sidebarButtonStyle(adminTab === 'admin')} onClick={() => setAdminTab('admin')}>
               <BarChart2 size={18} /> Overview
             </button>
@@ -705,7 +705,7 @@ export default function App() {
             </button>
           </aside>
 
-          <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+          <main className="portal-main">
             {adminMessage ? <p className="auth-message success" style={{ marginBottom: '1.5rem' }}>{adminMessage}</p> : null}
 
             {adminTab === 'admin' && (
@@ -1065,9 +1065,9 @@ export default function App() {
     );
   }
 
-  // FRONTEND USER PORTAL WITH LEFT SIDEBAR NAVIGATION
+  // FRONTEND USER PORTAL WITH RESPONSIVE LAYOUT
   return (
-    <div className="wellness-app" style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+    <div className="wellness-app">
       <header className="passport-top-bar" style={{ padding: '1rem 2rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span className="brand-badge"><IdCard className="button-icon" /></span>
@@ -1079,10 +1079,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* FRONTEND LAYOUT WITH SIDEBAR ON THE LEFT */}
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 70px)' }}>
-        {/* VERTICAL SIDEBAR MENU FOR PARTICIPANTS */}
-        <aside style={{ width: '250px', background: '#ffffff', borderRight: '1px solid #e2e8f0', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', flexShrink: 0 }}>
+      <div className="portal-body">
+        <aside className="portal-sidebar">
           <button type="button" style={sidebarButtonStyle(activePortalTab === 'home')} onClick={() => setActivePortalTab('home')}>
             <HomeIcon size={18} /> Home
           </button>
@@ -1100,8 +1098,7 @@ export default function App() {
           </button>
         </aside>
 
-        {/* MAIN USER CONTENT */}
-        <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+        <main className="portal-main">
           {formError && <div className="auth-message error" style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '8px' }}>{formError}</div>}
 
           {/* HOME TAB */}
