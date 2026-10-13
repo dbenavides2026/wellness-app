@@ -63,16 +63,19 @@ function validatePasswordPolicy(password) {
   return null;
 }
 
-// Generate Guaranteed Base64/SVG Data URL for QR Code
-async function generateQrDataUrl(codeText) {
-  try {
-    const svgString = await QRCode.toString(codeText, { type: 'svg', margin: 2 });
-    const encodedSvg = encodeURIComponent(svgString);
-    return `data:image/svg+xml;charset=utf-8,${encodedSvg}`;
-  } catch (err) {
-    console.error(`QR Generation error for code: ${codeText}`, err);
-    return '';
-  }
+// Reliable Promise Wrapper for QR Code Generation
+function generateQrDataUrl(codeText) {
+  return new Promise((resolve) => {
+    QRCode.toString(codeText, { type: 'svg', margin: 2 }, (err, svg) => {
+      if (err || !svg) {
+        console.error(`QR Generation error for code: ${codeText}`, err);
+        resolve('');
+      } else {
+        const encodedSvg = encodeURIComponent(svg);
+        resolve(`data:image/svg+xml;charset=utf-8,${encodedSvg}`);
+      }
+    });
+  });
 }
 
 // QR Catalog Generator
@@ -293,8 +296,13 @@ app.get('/api/admin/stats', (req, res) => {
 });
 
 app.get('/api/admin/qr-codes', async (req, res) => {
-  const qrCodes = await getQrCodeCatalog();
-  res.json({ qrCodes });
+  try {
+    const qrCodes = await getQrCodeCatalog();
+    res.json({ qrCodes });
+  } catch (err) {
+    console.error('Error serving QR catalog:', err);
+    res.status(500).json({ message: 'Failed to generate QR catalog.' });
+  }
 });
 
 app.post('/api/admin/participants/:id/promote', (req, res) => {
