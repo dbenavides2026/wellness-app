@@ -132,12 +132,13 @@ const sanitizeUser = (user) => {
   return rest;
 };
 
+// Points set to 1 for Hiking and Running Club default check-ins
 const categoryQrConfigurations = [
   { id: 'gym', categoryId: 'gym', title: 'Gym / Solo Workout', points: 1, code: 'WELLNESS-GYM-101', scanCode: 'WELLNESS-GYM-101', isCategory: true },
   { id: 'group', categoryId: 'group', title: 'Group Fitness Class', points: 2, code: 'WELLNESS-GROUP-202', scanCode: 'WELLNESS-GROUP-202', isCategory: true },
   { id: 'sports', categoryId: 'sports', title: 'Sports & Outdoor Game', points: 2, code: 'WELLNESS-SPORTS-303', scanCode: 'WELLNESS-SPORTS-303', isCategory: true },
-  { id: 'hiking-club-checkin', categoryId: 'hiking-club-checkin', title: 'Hiking Club Expedition', points: 3, code: 'HIKING-CLUB-101', scanCode: 'HIKING-CLUB-101', isCategory: true },
-  { id: 'running-club-checkin', categoryId: 'running-club-checkin', title: 'Running Club Session', points: 3, code: 'RUNNING-CLUB-101', scanCode: 'RUNNING-CLUB-101', isCategory: true }
+  { id: 'hiking-club-checkin', categoryId: 'hiking-club-checkin', title: 'Hiking Club Expedition', points: 1, code: 'HIKING-CLUB-101', scanCode: 'HIKING-CLUB-101', isCategory: true },
+  { id: 'running-club-checkin', categoryId: 'running-club-checkin', title: 'Running Club Session', points: 1, code: 'RUNNING-CLUB-101', scanCode: 'RUNNING-CLUB-101', isCategory: true }
 ];
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
