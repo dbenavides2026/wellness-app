@@ -518,7 +518,7 @@ export default function App() {
       .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
       .join('\n');
 
-    const blob = new Blob([csvContent], { type: 'type/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.setAttribute('download', `participants-report-${reportCategory}.csv`);
@@ -1172,7 +1172,7 @@ export default function App() {
           {activePortalTab === 'hiking' && (
             <>
               <header className="passport-header" style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight 700 }}>Hiking Club Expeditions</h2>
+                <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Hiking Club Expeditions</h2>
               </header>
 
               <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -1201,7 +1201,7 @@ export default function App() {
           {activePortalTab === 'running' && (
             <>
               <header className="passport-header" style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight 700 }}>Running Club Sessions</h2>
+                <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Running Club Sessions</h2>
               </header>
 
               <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
