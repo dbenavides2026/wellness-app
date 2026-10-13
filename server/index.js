@@ -46,6 +46,7 @@ function loadDatabase() {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       const parsed = JSON.parse(data);
       if (!Array.isArray(parsed.participants)) parsed.participants = defaultDb.participants;
+      if (!Array.isArray(parsed.communityPosts)) parsed.communityPosts = defaultDb.communityPosts;
       if (!parsed.participants.some(p => p.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase())) {
         parsed.participants.unshift(defaultDb.participants[0]);
       }
@@ -115,7 +116,7 @@ async function getQrCodeCatalog() {
   );
 }
 
-// Routes
+// Rutas de Login y Registro
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const user = db.participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
@@ -199,6 +200,7 @@ app.put('/api/participants/:id/profile', async (req, res) => {
   res.json({ user: userPayload });
 });
 
+// Desafíos y Campañas
 app.get('/api/challenges', (req, res) => res.json({ challenges: db.specialChallenges }));
 app.get('/api/hiking-challenges', (req, res) => res.json({ challenges: db.hikingChallenges }));
 app.get('/api/running-challenges', (req, res) => res.json({ challenges: db.runningChallenges }));
@@ -340,7 +342,7 @@ app.get('/api/admin/qr-codes', async (req, res) => {
     const qrCodes = await getQrCodeCatalog();
     res.json({ qrCodes });
   } catch (err) {
-    console.error('Error en catálogo QR:', err);
+    console.error('Error generando catálogo QR:', err);
     res.status(500).json({ message: 'Error generando catálogo.' });
   }
 });
