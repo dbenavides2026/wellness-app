@@ -16,10 +16,8 @@ app.use(express.json({ limit: '10mb' }));
 const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
 const superadminPasswordHash = bcrypt.hashSync('WellnessDigit@l*2026', 10);
 
-// Ruta del archivo de persistencia JSON
 const DB_FILE = path.join(__dirname, 'db.json');
 
-// Estructura por defecto de la base de datos
 const defaultDb = {
   participants: [
     {
@@ -38,42 +36,36 @@ const defaultDb = {
   hikingStatus: { isActive: true, title: 'Active Hiking Season Campaign', startDate: new Date().toISOString(), endDate: '' },
   runningStatus: { isActive: true, title: 'Active Running Season Campaign', startDate: new Date().toISOString(), endDate: '' },
   communityPosts: [
-    { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, createdAt: new Date().toISOString() }
+    { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, likes: [], createdAt: new Date().toISOString() }
   ]
 };
 
-// Función para cargar los datos desde el archivo local
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       const parsed = JSON.parse(data);
-      
-      // Asegurar que el superadmin siempre exista
       if (!parsed.participants.some(p => p.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase())) {
         parsed.participants.unshift(defaultDb.participants[0]);
       }
       return parsed;
     }
   } catch (err) {
-    console.error('Error al leer db.json, usando base de datos por defecto:', err);
+    console.error('Error reading db.json:', err);
   }
   return defaultDb;
 }
 
-// Inicialización de la base de datos en memoria cargando desde archivo
 let db = loadDatabase();
 
-// Función para guardar los cambios en el archivo db.json
 function saveDatabase() {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error al guardar en db.json:', err);
+    console.error('Error saving db.json:', err);
   }
 }
 
-// Validador de política de contraseñas
 function validatePasswordPolicy(password) {
   const minLength = 8;
   const maxLength = 16;
@@ -88,7 +80,6 @@ function validatePasswordPolicy(password) {
   return null;
 }
 
-// Generador de QR
 async function generateQrDataUrl(codeText) {
   try {
     const svgString = await QRCode.toString(codeText, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' });
@@ -99,7 +90,6 @@ async function generateQrDataUrl(codeText) {
   }
 }
 
-// Catálogo de Códigos QR
 async function getQrCodeCatalog() {
   const baseItems = [
     { id: 'gym', title: 'Gym / Solo Workout', code: 'WELLNESS-GYM-101' },
@@ -132,8 +122,7 @@ async function getQrCodeCatalog() {
   );
 }
 
-// --- Rutas de API ---
-
+// API Routes
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const user = db.participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
@@ -219,7 +208,7 @@ app.put('/api/participants/:id/profile', async (req, res) => {
   res.json({ user: userPayload });
 });
 
-// --- Desafíos y Campañas ---
+// Campaign & Challenges
 app.get('/api/challenges', (req, res) => res.json({ challenges: db.specialChallenges }));
 app.get('/api/hiking-challenges', (req, res) => res.json({ challenges: db.hikingChallenges }));
 app.get('/api/running-challenges', (req, res) => res.json({ challenges: db.runningChallenges }));
@@ -312,15 +301,35 @@ app.delete('/api/admin/running-challenges/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-// --- Comunidad ---
+// Community Feed & Like System
 app.get('/api/admin/community', (req, res) => res.json({ posts: db.communityPosts }));
 
 app.post('/api/admin/community', (req, res) => {
   const { author, role, message, image, isAnnouncement } = req.body;
-  const newPost = { id: String(Date.now()), author, role: role || 'participant', message: message || '', image: image || '', isAnnouncement: Boolean(isAnnouncement), createdAt: new Date().toISOString() };
+  const newPost = { id: String(Date.now()), author, role: role || 'participant', message: message || '', image: image || '', isAnnouncement: Boolean(isAnnouncement), likes: [], createdAt: new Date().toISOString() };
   db.communityPosts = [newPost, ...db.communityPosts];
   saveDatabase();
   res.status(201).json({ post: newPost });
+});
+
+app.post('/api/admin/community/:id/like', (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+
+  const post = db.communityPosts.find(p => p.id === id);
+  if (!post) return res.status(404).json({ message: 'Post not found.' });
+
+  if (!Array.isArray(post.likes)) post.likes = [];
+
+  const userIndex = post.likes.indexOf(userId);
+  if (userIndex >= 0) {
+    post.likes.splice(userIndex, 1);
+  } else {
+    post.likes.push(userId);
+  }
+
+  saveDatabase();
+  res.json({ post });
 });
 
 app.delete('/api/admin/community/:id', (req, res) => {
@@ -329,7 +338,7 @@ app.delete('/api/admin/community/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-// --- Estadísticas y Catálogo QR ---
+// Stats & QR Catalog
 app.get('/api/admin/stats', (req, res) => {
   const totalParticipants = db.participants.length;
   const activeParticipants = db.participants.filter(p => (p.stamps || []).length > 0).length;
@@ -344,8 +353,8 @@ app.get('/api/admin/qr-codes', async (req, res) => {
     const qrCodes = await getQrCodeCatalog();
     res.json({ qrCodes });
   } catch (err) {
-    console.error('Error al generar catálogo de QR:', err);
-    res.status(500).json({ message: 'Error generando catálogo de QR.' });
+    console.error('Error generating QR catalog:', err);
+    res.status(500).json({ message: 'Error generating QR catalog.' });
   }
 });
 
@@ -363,7 +372,6 @@ app.delete('/api/admin/participants/:id', (req, res) => {
   res.json({ message: 'User deleted.' });
 });
 
-// Servir archivos estáticos del frontend
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
