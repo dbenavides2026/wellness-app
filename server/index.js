@@ -45,13 +45,14 @@ function loadDatabase() {
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed.participants)) parsed.participants = defaultDb.participants;
       if (!parsed.participants.some(p => p.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase())) {
         parsed.participants.unshift(defaultDb.participants[0]);
       }
       return parsed;
     }
   } catch (err) {
-    console.error('Error reading db.json:', err);
+    console.error('Error cargando db.json:', err);
   }
   return defaultDb;
 }
@@ -62,7 +63,7 @@ function saveDatabase() {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error saving db.json:', err);
+    console.error('Error guardando db.json:', err);
   }
 }
 
@@ -105,24 +106,16 @@ async function getQrCodeCatalog() {
     ...db.runningChallenges.map(c => ({ id: c.id, title: c.title, code: c.scanCode || `RUNNING-SPEC-${c.id.slice(-4)}` }))
   ];
 
-  const allItems = [...baseItems, ...specialItems];
-
   return Promise.all(
-    allItems.map(async (item) => {
+    [...baseItems, ...specialItems].map(async (item) => {
       const code = item.code || 'WELLNESS-DEFAULT';
       const qrCode = await generateQrDataUrl(code);
-      return {
-        id: item.id,
-        title: item.title,
-        scanCode: code,
-        code: code,
-        qrCode: qrCode
-      };
+      return { id: item.id, title: item.title, scanCode: code, code, qrCode };
     })
   );
 }
 
-// API Routes
+// Routes
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const user = db.participants.find(p => p.email.toLowerCase() === (email || '').toLowerCase());
@@ -181,7 +174,6 @@ app.post('/api/participants/:id/stamps', (req, res) => {
   user.stamps = [newStamp, ...(user.stamps || [])];
 
   saveDatabase();
-
   const { passwordHash, ...userPayload } = user;
   res.json({ user: userPayload });
 });
@@ -203,12 +195,10 @@ app.put('/api/participants/:id/profile', async (req, res) => {
   if (profileImage !== undefined) user.profileImage = profileImage;
 
   saveDatabase();
-
   const { passwordHash, ...userPayload } = user;
   res.json({ user: userPayload });
 });
 
-// Campaign & Challenges
 app.get('/api/challenges', (req, res) => res.json({ challenges: db.specialChallenges }));
 app.get('/api/hiking-challenges', (req, res) => res.json({ challenges: db.hikingChallenges }));
 app.get('/api/running-challenges', (req, res) => res.json({ challenges: db.runningChallenges }));
@@ -226,7 +216,6 @@ app.post('/api/admin/challenge-status/start', (req, res) => {
 
 app.post('/api/admin/challenge-status/end', (req, res) => {
   db.challengeStatus = { isActive: false, title: 'Wellness Challenge Campaign Ended' };
-  db.participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => s.scanCode?.startsWith('HIKING-') || s.scanCode?.startsWith('RUNNING-')) : []; });
   saveDatabase();
   res.json({ status: db.challengeStatus });
 });
@@ -240,7 +229,6 @@ app.post('/api/admin/hiking-status/start', (req, res) => {
 
 app.post('/api/admin/hiking-status/end', (req, res) => {
   db.hikingStatus = { isActive: false, title: 'Hiking Season Ended' };
-  db.participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => !s.scanCode?.startsWith('HIKING-')) : []; });
   saveDatabase();
   res.json({ status: db.hikingStatus });
 });
@@ -254,7 +242,6 @@ app.post('/api/admin/running-status/start', (req, res) => {
 
 app.post('/api/admin/running-status/end', (req, res) => {
   db.runningStatus = { isActive: false, title: 'Running Season Ended' };
-  db.participants.forEach(p => { p.stamps = p.stamps ? p.stamps.filter(s => !s.scanCode?.startsWith('RUNNING-')) : []; });
   saveDatabase();
   res.json({ status: db.runningStatus });
 });
@@ -301,7 +288,7 @@ app.delete('/api/admin/running-challenges/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-// Community Feed & Like System
+// Comunidad y Likes
 app.get('/api/admin/community', (req, res) => res.json({ posts: db.communityPosts }));
 
 app.post('/api/admin/community', (req, res) => {
@@ -321,11 +308,12 @@ app.post('/api/admin/community/:id/like', (req, res) => {
 
   if (!Array.isArray(post.likes)) post.likes = [];
 
-  const userIndex = post.likes.indexOf(userId);
-  if (userIndex >= 0) {
-    post.likes.splice(userIndex, 1);
+  const uid = String(userId || 'anonymous');
+  const index = post.likes.indexOf(uid);
+  if (index >= 0) {
+    post.likes.splice(index, 1);
   } else {
-    post.likes.push(userId);
+    post.likes.push(uid);
   }
 
   saveDatabase();
@@ -338,7 +326,6 @@ app.delete('/api/admin/community/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-// Stats & QR Catalog
 app.get('/api/admin/stats', (req, res) => {
   const totalParticipants = db.participants.length;
   const activeParticipants = db.participants.filter(p => (p.stamps || []).length > 0).length;
@@ -353,8 +340,8 @@ app.get('/api/admin/qr-codes', async (req, res) => {
     const qrCodes = await getQrCodeCatalog();
     res.json({ qrCodes });
   } catch (err) {
-    console.error('Error generating QR catalog:', err);
-    res.status(500).json({ message: 'Error generating QR catalog.' });
+    console.error('Error en catálogo QR:', err);
+    res.status(500).json({ message: 'Error generando catálogo.' });
   }
 });
 
