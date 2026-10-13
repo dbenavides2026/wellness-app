@@ -218,28 +218,96 @@ const ensureSuperAdmin = async () => {
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/participants', (_req, res) => res.json({ participants: readParticipants().map(sanitizeUser) }));
 
-app.put('/api/participants/:id/profile', async (req, res) => {
+app.get('/api/admin/qr-codes', async (_req, res) => {
   try {
-    const { id } = req.params;
-    const { fullName, email, password, profileImage } = req.body;
-    const participants = readParticipants();
-    const idx = participants.findIndex((p) => p.id === id);
-
-    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
-
-    if (fullName) participants[idx].fullName = String(fullName).trim();
-    if (email) participants[idx].email = normalizeEmail(email);
-    if (profileImage !== undefined) participants[idx].profileImage = profileImage;
-
-    if (password && String(password).trim().length >= 6) {
-      participants[idx].password = await bcrypt.hash(String(password).trim(), 10);
-    }
-
-    writeParticipants(participants);
-    return res.json({ user: sanitizeUser(participants[idx]), message: 'Profile updated successfully.' });
+    const qrCodes = await buildQrCatalog();
+    return res.json({ qrCodes, categories: categoryQrConfigurations });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
+});
+
+// Activity Creation Endpoints
+app.post('/api/admin/challenges', async (req, res) => {
+  const { title, description, points, scanCode, proofPrompt } = req.body;
+  if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
+
+  const finalScanCode = String(scanCode || `WELLNESS-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
+  const challenges = readSpecialChallenges();
+  const challenge = {
+    id: crypto.randomUUID(),
+    title: String(title).trim(),
+    description: String(description).trim(),
+    points: Number(points) || 10,
+    scanCode: finalScanCode,
+    proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim()
+  };
+
+  challenges.unshift(challenge);
+  writeSpecialChallenges(challenges);
+  return res.status(201).json({ challenge, challenges });
+});
+
+app.post('/api/admin/hiking-challenges', async (req, res) => {
+  const { title, description, points, scanCode, proofPrompt } = req.body;
+  if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
+
+  const finalScanCode = String(scanCode || `HIKING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
+  const challenges = readHikingChallenges();
+  const challenge = {
+    id: crypto.randomUUID(),
+    title: String(title).trim(),
+    description: String(description).trim(),
+    points: Number(points) || 15,
+    scanCode: finalScanCode,
+    proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim()
+  };
+
+  challenges.unshift(challenge);
+  writeHikingChallenges(challenges);
+  return res.status(201).json({ challenge, challenges });
+});
+
+app.post('/api/admin/running-challenges', async (req, res) => {
+  const { title, description, points, scanCode, proofPrompt } = req.body;
+  if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
+
+  const finalScanCode = String(scanCode || `RUNNING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase();
+  const challenges = readRunningChallenges();
+  const challenge = {
+    id: crypto.randomUUID(),
+    title: String(title).trim(),
+    description: String(description).trim(),
+    points: Number(points) || 12,
+    scanCode: finalScanCode,
+    proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim()
+  };
+
+  challenges.unshift(challenge);
+  writeRunningChallenges(challenges);
+  return res.status(201).json({ challenge, challenges });
+});
+
+app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
+app.get('/api/hiking-challenges', (_req, res) => res.json({ challenges: readHikingChallenges() }));
+app.get('/api/running-challenges', (_req, res) => res.json({ challenges: readRunningChallenges() }));
+
+app.delete('/api/admin/challenges/:id', (req, res) => {
+  const challenges = readSpecialChallenges().filter((c) => c.id !== req.params.id);
+  writeSpecialChallenges(challenges);
+  return res.json({ deleted: true, challenges });
+});
+
+app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
+  const challenges = readHikingChallenges().filter((c) => c.id !== req.params.id);
+  writeHikingChallenges(challenges);
+  return res.json({ deleted: true, challenges });
+});
+
+app.delete('/api/admin/running-challenges/:id', (req, res) => {
+  const challenges = readRunningChallenges().filter((c) => c.id !== req.params.id);
+  writeRunningChallenges(challenges);
+  return res.json({ deleted: true, challenges });
 });
 
 app.post('/api/register', async (req, res) => {
@@ -294,15 +362,6 @@ app.post('/api/admin/login', async (req, res) => {
   }
 });
 
-app.get('/api/admin/qr-codes', async (_req, res) => {
-  try {
-    const qrCodes = await buildQrCatalog();
-    return res.json({ qrCodes, categories: categoryQrConfigurations });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
 app.get('/api/admin/stats', (_req, res) => {
   try {
     const participants = readParticipants();
@@ -318,52 +377,9 @@ app.get('/api/admin/stats', (_req, res) => {
   }
 });
 
-app.put('/api/admin/participants/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const { fullName, email, role } = req.body;
-    const participants = readParticipants();
-    const idx = participants.findIndex((p) => p.id === id);
-
-    if (idx === -1) return res.status(404).json({ message: 'User not found.' });
-    if (fullName) participants[idx].fullName = String(fullName).trim();
-    if (email) participants[idx].email = normalizeEmail(email);
-    if (role) participants[idx].role = role;
-
-    writeParticipants(participants);
-    return res.json({ user: sanitizeUser(participants[idx]), message: 'User updated successfully.' });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.delete('/api/admin/participants/:id', (req, res) => {
-  try {
-    let participants = readParticipants();
-    participants = participants.filter((p) => p.id !== req.params.id);
-    writeParticipants(participants);
-    return res.json({ message: 'User deleted successfully.' });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.post('/api/admin/participants/:id/promote', (req, res) => {
-  try {
-    const participants = readParticipants();
-    const idx = participants.findIndex((p) => p.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ message: 'Participant not found.' });
-
-    participants[idx].role = 'admin';
-    writeParticipants(participants);
-    return res.json({ user: sanitizeUser(participants[idx]), message: `${participants[idx].fullName} assigned as admin.` });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
-
-app.get('/api/challenges', (_req, res) => res.json({ challenges: readSpecialChallenges() }));
 app.get('/api/admin/challenge-status', (_req, res) => res.json({ status: readChallengeStatus() }));
+app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
+app.get('/api/admin/running-status', (_req, res) => res.json({ status: readRunningStatus() }));
 
 app.post('/api/admin/challenge-status/start', (req, res) => {
   const status = { isActive: true, title: String(req.body.title || 'Active Wellness Challenge Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
@@ -379,26 +395,6 @@ app.post('/api/admin/challenge-status/end', (_req, res) => {
   return res.json({ status });
 });
 
-app.post('/api/admin/challenges', (req, res) => {
-  const { title, description, points, scanCode, proofPrompt } = req.body;
-  if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
-
-  const challenges = readSpecialChallenges();
-  const challenge = { id: crypto.randomUUID(), title: String(title).trim(), description: String(description).trim(), points: Number(points) || 10, scanCode: String(scanCode || `WELLNESS-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase(), proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim() };
-  challenges.unshift(challenge);
-  writeSpecialChallenges(challenges);
-  return res.status(201).json({ challenge, challenges });
-});
-
-app.delete('/api/admin/challenges/:id', (req, res) => {
-  const challenges = readSpecialChallenges().filter((c) => c.id !== req.params.id);
-  writeSpecialChallenges(challenges);
-  return res.json({ deleted: true, challenges });
-});
-
-app.get('/api/hiking-challenges', (_req, res) => res.json({ challenges: readHikingChallenges() }));
-app.get('/api/admin/hiking-status', (_req, res) => res.json({ status: readHikingStatus() }));
-
 app.post('/api/admin/hiking-status/start', (req, res) => {
   const status = { isActive: true, title: String(req.body.title || 'Active Hiking Season Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
   writeHikingStatus(status);
@@ -411,26 +407,6 @@ app.post('/api/admin/hiking-status/end', (_req, res) => {
   return res.json({ status });
 });
 
-app.post('/api/admin/hiking-challenges', (req, res) => {
-  const { title, description, points, scanCode, proofPrompt } = req.body;
-  if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
-
-  const challenges = readHikingChallenges();
-  const challenge = { id: crypto.randomUUID(), title: String(title).trim(), description: String(description).trim(), points: Number(points) || 15, scanCode: String(scanCode || `HIKING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase(), proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim() };
-  challenges.unshift(challenge);
-  writeHikingChallenges(challenges);
-  return res.status(201).json({ challenge, challenges });
-});
-
-app.delete('/api/admin/hiking-challenges/:id', (req, res) => {
-  const challenges = readHikingChallenges().filter((c) => c.id !== req.params.id);
-  writeHikingChallenges(challenges);
-  return res.json({ deleted: true, challenges });
-});
-
-app.get('/api/running-challenges', (_req, res) => res.json({ challenges: readRunningChallenges() }));
-app.get('/api/admin/running-status', (_req, res) => res.json({ status: readRunningStatus() }));
-
 app.post('/api/admin/running-status/start', (req, res) => {
   const status = { isActive: true, title: String(req.body.title || 'Active Running Season Campaign').trim(), startedAt: new Date().toISOString(), endedAt: '' };
   writeRunningStatus(status);
@@ -441,34 +417,6 @@ app.post('/api/admin/running-status/end', (_req, res) => {
   const status = { isActive: false, title: 'Running Season Ended', startedAt: '', endedAt: new Date().toISOString() };
   writeRunningStatus(status);
   return res.json({ status });
-});
-
-app.post('/api/admin/running-challenges', (req, res) => {
-  const { title, description, points, scanCode, proofPrompt } = req.body;
-  if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
-
-  const challenges = readRunningChallenges();
-  const challenge = { id: crypto.randomUUID(), title: String(title).trim(), description: String(description).trim(), points: Number(points) || 12, scanCode: String(scanCode || `RUNNING-SPECIAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`).trim().toUpperCase(), proofPrompt: String(proofPrompt || 'Upload a photo proof.').trim() };
-  challenges.unshift(challenge);
-  writeRunningChallenges(challenges);
-  return res.status(201).json({ challenge, challenges });
-});
-
-app.delete('/api/admin/running-challenges/:id', (req, res) => {
-  const challenges = readRunningChallenges().filter((c) => c.id !== req.params.id);
-  writeRunningChallenges(challenges);
-  return res.json({ deleted: true, challenges });
-});
-
-app.get('/api/admin/community', (_req, res) => res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) }));
-
-app.post('/api/admin/community', (req, res) => {
-  const { message, image, author, role, isAnnouncement } = req.body;
-  const posts = readCommunityPosts();
-  const post = { id: crypto.randomUUID(), author: isAnnouncement ? 'Wellness Team' : author || 'Community Member', role: role || 'participant', message: String(message || '').trim(), image: String(image || '').trim(), isAnnouncement: Boolean(isAnnouncement), createdAt: new Date().toISOString() };
-  posts.unshift(post);
-  writeCommunityPosts(posts);
-  return res.status(201).json({ post, posts });
 });
 
 app.post('/api/participants/:id/stamps', (req, res) => {
@@ -511,6 +459,8 @@ app.post('/api/participants/:id/stamps', (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
+
+app.get('/api/admin/community', (_req, res) => res.json({ posts: readCommunityPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) }));
 
 app.get('/api/admin/report', (_req, res) => {
   const report = readParticipants().map((p) => {
