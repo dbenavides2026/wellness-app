@@ -59,6 +59,9 @@ export default function App() {
   const [editingParticipantDraft, setEditingParticipantDraft] = useState({ fullName: '', email: '', role: 'participant' });
   const [adminCommunityPosts, setAdminCommunityPosts] = useState([]);
   const [adminCommunityDraft, setAdminCommunityDraft] = useState({ message: '', image: '', isAnnouncement: true });
+  const [editingCommunityId, setEditingCommunityId] = useState(null);
+  const [editingCommunityDraft, setEditingCommunityDraft] = useState({ message: '' });
+
   const [communityPosts, setCommunityPosts] = useState([]);
   const [communityDraft, setCommunityDraft] = useState({ message: '', image: '' });
   const [screen, setScreen] = useState('login');
@@ -416,6 +419,31 @@ export default function App() {
     } catch (error) { setAdminMessage(error.message || 'Unable to save community update.'); }
   };
 
+  const handleSaveCommunityEdit = async (id) => {
+    try {
+      await fetchJson(`/api/admin/community/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ message: editingCommunityDraft.message })
+      });
+      setEditingCommunityId(null);
+      setAdminMessage('Community announcement updated.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to update announcement.');
+    }
+  };
+
+  const handleDeleteCommunityPost = async (id) => {
+    if (!window.confirm('Delete this community post?')) return;
+    try {
+      await fetchJson(`/api/admin/community/${id}`, { method: 'DELETE' });
+      setAdminMessage('Post deleted.');
+      await refreshAllData();
+    } catch (error) {
+      setAdminMessage(error.message || 'Unable to delete post.');
+    }
+  };
+
   const handleSaveSpecialChallenge = async () => {
     const title = challengeForm.title.trim(); const description = challengeForm.description.trim();
     if (!title || !description) { setAdminMessage('Activity name and description are required.'); return; }
@@ -441,6 +469,33 @@ export default function App() {
       await fetchJson('/api/admin/running-challenges', { method: 'POST', body: JSON.stringify({ ...runningForm, points: Number(runningForm.points) || 12 }) });
       setRunningForm({ title: '', description: '', points: 12, scanCode: '', proofPrompt: '' }); setAdminMessage('Running activity saved successfully.'); await refreshAllData(); await refreshAdminData();
     } catch (error) { setAdminMessage(error.message || 'Unable to save running activity.'); }
+  };
+
+  const handleStartChallenge = async () => {
+    try { const res = await fetchJson('/api/admin/challenge-status/start', { method: 'POST', body: JSON.stringify({ title: 'Active Wellness Challenge Campaign' }) }); setChallengeStatus(res.status); setAdminMessage('New Wellness Challenge campaign started.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const handleEndChallenge = async () => {
+    if (!window.confirm('Ending this campaign will reset all Wellness Challenge points and stamps. Proceed?')) return;
+    try { const res = await fetchJson('/api/admin/challenge-status/end', { method: 'POST' }); setChallengeStatus(res.status); setAdminMessage('Wellness Challenge campaign ended. Points reset.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const handleStartHikingSeason = async () => {
+    try { const res = await fetchJson('/api/admin/hiking-status/start', { method: 'POST', body: JSON.stringify({ title: 'Active Hiking Season Campaign' }) }); setHikingStatus(res.status); setAdminMessage('New Hiking Season started.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const handleEndHikingSeason = async () => {
+    if (!window.confirm('Ending this campaign will reset all Hiking Club points and stamps. Proceed?')) return;
+    try { const res = await fetchJson('/api/admin/hiking-status/end', { method: 'POST' }); setHikingStatus(res.status); setAdminMessage('Hiking Season ended. Points reset.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const handleStartRunningSeason = async () => {
+    try { const res = await fetchJson('/api/admin/running-status/start', { method: 'POST', body: JSON.stringify({ title: 'Active Running Season Campaign' }) }); setRunningStatus(res.status); setAdminMessage('New Running Season started.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const handleEndRunningSeason = async () => {
+    if (!window.confirm('Ending this campaign will reset all Running Club points and stamps. Proceed?')) return;
+    try { const res = await fetchJson('/api/admin/running-status/end', { method: 'POST' }); setRunningStatus(res.status); setAdminMessage('Running Season ended. Points reset.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
   };
 
   const getStampBadge = (title) => {
@@ -509,6 +564,14 @@ export default function App() {
     );
   };
 
+  const getTopUsersByFilter = (filterFn) => {
+    return participants.map((p) => {
+      const filteredStamps = (p.stamps || []).filter(filterFn);
+      const points = filteredStamps.reduce((s, st) => s + Number(st.points || 0), 0);
+      return { id: p.id, fullName: p.fullName, points };
+    }).sort((a, b) => b.points - a.points).slice(0, 10);
+  };
+
   if (screen === 'login') {
     return (
       <div className="auth-app"><div className="auth-card">
@@ -561,10 +624,14 @@ export default function App() {
 
   if (screen === 'admin-dashboard') {
     const stats = adminStats?.stats || {};
-    const categoryEntries = Object.entries(stats.categoryBreakdown || {});
-    const topUsers = [...adminReport].sort((a, b) => Number(b.totalPoints) - Number(a.totalPoints)).slice(0, 10);
-    const maxCategoryCount = categoryEntries.length > 0 ? Math.max(...categoryEntries.map(([, count]) => Number(count || 0))) : 1;
-    const maxUserPoints = topUsers.length > 0 ? Math.max(...topUsers.map((u) => Number(u.totalPoints || 0))) : 1;
+
+    const topWellnessUsers = getTopUsersByFilter((s) => !s.scanCode?.startsWith('HIKING-') && !s.scanCode?.startsWith('RUNNING-'));
+    const topHikingUsers = getTopUsersByFilter((s) => s.scanCode?.startsWith('HIKING-'));
+    const topRunningUsers = getTopUsersByFilter((s) => s.scanCode?.startsWith('RUNNING-'));
+
+    const maxWellnessPts = Math.max(...topWellnessUsers.map(u => u.points), 1);
+    const maxHikingPts = Math.max(...topHikingUsers.map(u => u.points), 1);
+    const maxRunningPts = Math.max(...topRunningUsers.map(u => u.points), 1);
 
     return (
       <div className="admin-app"><div className="admin-shell">
@@ -593,31 +660,49 @@ export default function App() {
               <article className="metric-card"><span>Total stamps</span><strong>{stats.totalStamps || 0}</strong></article>
               <article className="metric-card"><span>Total points</span><strong>{stats.totalPoints || 0}</strong></article>
             </section>
-            <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', margin: '1.5rem 0' }}>
+
+            {/* LEADERBOARDS PER CATEGORY (3 GRAPHS) */}
+            <section className="admin-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', margin: '1.5rem 0' }}>
               <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
-                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Category activity</h3>
+                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Top 10: Wellness Challenge</h3>
                 <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {categoryEntries.map(([key, count]) => (
-                    <div key={key} className="bar-row">
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{key}</span>
+                  {topWellnessUsers.map((u) => (
+                    <div key={u.id} className="bar-row">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{u.fullName}</span>
                       <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
-                        <div className="bar-fill" style={{ width: `${(Number(count || 0) / maxCategoryCount) * 100}%`, background: '#0b41cd', height: '100%' }} />
+                        <div className="bar-fill" style={{ width: `${(u.points / maxWellnessPts) * 100}%`, background: '#0b41cd', height: '100%' }} />
                       </div>
-                      <strong style={{ color: '#0f172a' }}>{count}</strong>
+                      <strong style={{ color: '#0f172a' }}>{u.points} pts</strong>
                     </div>
                   ))}
                 </div>
               </div>
+
               <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
-                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Top 10 users by total points</h3>
-                <div className="bar-chart user-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {topUsers.map((entry) => (
-                    <div key={entry.id} className="bar-row">
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{entry.fullName}</span>
+                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Top 10: Hiking Club</h3>
+                <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {topHikingUsers.map((u) => (
+                    <div key={u.id} className="bar-row">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{u.fullName}</span>
                       <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
-                        <div className="bar-fill user-fill" style={{ width: `${Math.max((Number(entry.totalPoints || 0) / maxUserPoints) * 100, 8)}%`, background: '#f59e0b', height: '100%' }} />
+                        <div className="bar-fill" style={{ width: `${(u.points / maxHikingPts) * 100}%`, background: '#15803d', height: '100%' }} />
                       </div>
-                      <strong style={{ color: '#0f172a' }}>{entry.totalPoints} pts</strong>
+                      <strong style={{ color: '#0f172a' }}>{u.points} pts</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="admin-panel chart-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem' }}>
+                <h3 style={{ color: '#0f172a', margin: '0 0 1rem 0' }}>Top 10: Running Club</h3>
+                <div className="bar-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {topRunningUsers.map((u) => (
+                    <div key={u.id} className="bar-row">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>{u.fullName}</span>
+                      <div className="bar-track" style={{ background: '#f1f5f9', borderRadius: '4px', height: '10px', overflow: 'hidden', margin: '4px 0' }}>
+                        <div className="bar-fill" style={{ width: `${(u.points / maxRunningPts) * 100}%`, background: '#b45309', height: '100%' }} />
+                      </div>
+                      <strong style={{ color: '#0f172a' }}>{u.points} pts</strong>
                     </div>
                   ))}
                 </div>
@@ -626,7 +711,6 @@ export default function App() {
           </>
         )}
 
-        {/* USER MANAGEMENT WITH CLEAN WHITE BACKGROUND */}
         {adminTab === 'users' && (
           <section className="admin-panel assignment-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
             <h3 style={{ color: '#0f172a', margin: '0 0 1.25rem 0' }}>Registered Account Management</h3>
@@ -650,10 +734,22 @@ export default function App() {
           </section>
         )}
 
+        {/* MANAGE WELLNESS CHALLENGE */}
         {adminTab === 'challenge' && (
           <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-            <h3 style={{ color: '#0f172a' }}>Manage Wellness Challenge</h3>
-            <div className="special-challenges-layout" style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ color: '#0f172a', margin: 0 }}>Manage Wellness Challenge</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="secondary-button" onClick={handleEndChallenge} disabled={!challengeStatus.isActive}>End Campaign</button>
+                <button type="button" className="primary-button" onClick={handleStartChallenge}>Start New Campaign</button>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: challengeStatus.isActive ? '#15803d' : '#dc2626', fontWeight: 'bold' }}>
+              Campaign Status: {challengeStatus.isActive ? 'Active' : 'Ended (Users blocked from logging activities)'}
+            </p>
+
+            <div className="special-challenges-layout" style={{ marginTop: '1.5rem' }}>
               <div className="special-challenges-form">
                 <label><span className="input-label">Activity Name</span><input type="text" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} /></label>
                 <label><span className="input-label">Description</span><textarea value={challengeForm.description} onChange={(e) => setChallengeForm({ ...challengeForm, description: e.target.value })} /></label>
@@ -672,10 +768,22 @@ export default function App() {
           </section>
         )}
 
+        {/* MANAGE HIKING CLUB */}
         {adminTab === 'hiking' && (
           <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-            <h3 style={{ color: '#0f172a' }}>Manage Hiking Club</h3>
-            <div className="special-challenges-layout" style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ color: '#0f172a', margin: 0 }}>Manage Hiking Club</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="secondary-button" onClick={handleEndHikingSeason} disabled={!hikingStatus.isActive}>End Campaign</button>
+                <button type="button" className="primary-button" onClick={handleStartHikingSeason}>Start New Campaign</button>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: hikingStatus.isActive ? '#15803d' : '#dc2626', fontWeight: 'bold' }}>
+              Campaign Status: {hikingStatus.isActive ? 'Active' : 'Ended (Users blocked from logging activities)'}
+            </p>
+
+            <div className="special-challenges-layout" style={{ marginTop: '1.5rem' }}>
               <div className="special-challenges-form">
                 <label><span className="input-label">Hike Title</span><input type="text" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} /></label>
                 <label><span className="input-label">Description</span><textarea value={hikingForm.description} onChange={(e) => setHikingForm({ ...hikingForm, description: e.target.value })} /></label>
@@ -694,10 +802,22 @@ export default function App() {
           </section>
         )}
 
+        {/* MANAGE RUNNING CLUB */}
         {adminTab === 'running' && (
           <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-            <h3 style={{ color: '#0f172a' }}>Manage Running Club</h3>
-            <div className="special-challenges-layout" style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ color: '#0f172a', margin: 0 }}>Manage Running Club</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="secondary-button" onClick={handleEndRunningSeason} disabled={!runningStatus.isActive}>End Campaign</button>
+                <button type="button" className="primary-button" onClick={handleStartRunningSeason}>Start New Campaign</button>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: runningStatus.isActive ? '#15803d' : '#dc2626', fontWeight: 'bold' }}>
+              Campaign Status: {runningStatus.isActive ? 'Active' : 'Ended (Users blocked from logging activities)'}
+            </p>
+
+            <div className="special-challenges-layout" style={{ marginTop: '1.5rem' }}>
               <div className="special-challenges-form">
                 <label><span className="input-label">Run Title</span><input type="text" value={runningForm.title} onChange={(e) => setRunningForm({ ...runningForm, title: e.target.value })} /></label>
                 <label><span className="input-label">Description</span><textarea value={runningForm.description} onChange={(e) => setRunningForm({ ...runningForm, description: e.target.value })} /></label>
@@ -716,7 +836,7 @@ export default function App() {
           </section>
         )}
 
-        {/* COMMUNITY MANAGEMENT (ADMIN) */}
+        {/* COMMUNITY MANAGEMENT WITH EDIT & DELETE MODERATION */}
         {adminTab === 'community' && (
           <section className="admin-panel community-admin-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
             <h3 style={{ color: '#0f172a' }}>Community Management</h3>
@@ -737,11 +857,26 @@ export default function App() {
                 ) : (
                   adminCommunityPosts.map((post) => (
                     <div key={post.id} className="admin-community-item" style={{ padding: '0.75rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', borderLeft: '4px solid #0b41cd' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                        <strong style={{ color: '#0f172a' }}>{post.author}</strong>
-                        <small style={{ color: '#64748b' }}>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : ''}</small>
-                      </div>
-                      <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
+                      {editingCommunityId === post.id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <textarea value={editingCommunityDraft.message} onChange={(e) => setEditingCommunityDraft({ message: e.target.value })} rows={2} style={{ padding: '0.5rem' }} />
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button type="button" className="small-button" onClick={() => handleSaveCommunityEdit(post.id)}>Save</button>
+                            <button type="button" className="secondary-button small-action" onClick={() => setEditingCommunityId(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <strong style={{ color: '#0f172a' }}>{post.author} <small style={{ color: '#64748b' }}>({post.isAnnouncement ? 'Announcement' : 'User post'})</small></strong>
+                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                              <button type="button" className="icon-button edit-button" onClick={() => { setEditingCommunityId(post.id); setEditingCommunityDraft({ message: post.message }); }}><Edit size={14} /></button>
+                              <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={14} /></button>
+                            </div>
+                          </div>
+                          <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
+                        </>
+                      )}
                     </div>
                   ))
                 )}
@@ -750,7 +885,7 @@ export default function App() {
           </section>
         )}
 
-        {/* CATEGORY QR CODES (ADMIN) */}
+        {/* CATEGORY QR CODES */}
         {adminTab === 'qr' && (
           <section className="admin-panel qr-panel qr-sheet" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
             <h3 style={{ color: '#0f172a' }}>Category & Activity QR Codes</h3>
