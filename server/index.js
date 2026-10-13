@@ -63,7 +63,19 @@ function validatePasswordPolicy(password) {
   return null;
 }
 
-// Fixed QR Catalog Generator
+// Generate Guaranteed Base64/SVG Data URL for QR Code
+async function generateQrDataUrl(codeText) {
+  try {
+    const svgString = await QRCode.toString(codeText, { type: 'svg', margin: 2 });
+    const encodedSvg = encodeURIComponent(svgString);
+    return `data:image/svg+xml;charset=utf-8,${encodedSvg}`;
+  } catch (err) {
+    console.error(`QR Generation error for code: ${codeText}`, err);
+    return '';
+  }
+}
+
+// QR Catalog Generator
 async function getQrCodeCatalog() {
   const baseItems = [
     { id: 'gym', title: 'Gym / Solo Workout', code: 'WELLNESS-GYM-101' },
@@ -81,17 +93,18 @@ async function getQrCodeCatalog() {
 
   const allItems = [...baseItems, ...specialItems];
 
-  return Promise.all(
-    allItems.map(async (item) => {
-      try {
-        const qrCode = await QRCode.toDataURL(item.code || 'WELLNESS-DEFAULT');
-        return { ...item, scanCode: item.code, qrCode };
-      } catch (err) {
-        console.error(`QR Generation failed for ${item.title}:`, err);
-        return { ...item, scanCode: item.code, qrCode: '' };
-      }
-    })
-  );
+  const catalog = [];
+  for (const item of allItems) {
+    const code = item.code || 'WELLNESS-DEFAULT';
+    const qrCode = await generateQrDataUrl(code);
+    catalog.push({
+      ...item,
+      scanCode: code,
+      qrCode
+    });
+  }
+
+  return catalog;
 }
 
 // API Routes
