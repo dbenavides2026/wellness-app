@@ -367,13 +367,6 @@ export default function App() {
     } catch (error) { setAdminMessage(error.message || 'Unable to promote user.'); }
   };
 
-  const handleSaveUser = async () => {
-    try {
-      await fetchJson(`/api/admin/participants/${editingParticipantId}`, { method: 'PUT', body: JSON.stringify(editingParticipantDraft) });
-      setEditingParticipantId(null); setAdminMessage('User updated successfully.'); await refreshAllData(); await refreshAdminData();
-    } catch (error) { setAdminMessage(error.message || 'Unable to update user.'); }
-  };
-
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
@@ -1087,7 +1080,7 @@ export default function App() {
             )}
           </main>
         </div>
-      </div></div>
+      </div>
     );
   }
 
