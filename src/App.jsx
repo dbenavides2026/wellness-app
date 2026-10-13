@@ -102,9 +102,15 @@ export default function App() {
   const [runningChallenges, setRunningChallenges] = useState([]);
   const [runningStatus, setRunningStatus] = useState({ isActive: false, title: 'No active running season' });
 
-  const [challengeForm, setChallengeForm] = useState({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' });
-  const [hikingForm, setHikingForm] = useState({ title: '', description: '', points: 15, scanCode: '', proofPrompt: '' });
-  const [runningForm, setRunningForm] = useState({ title: '', description: '', points: 12, scanCode: '', proofPrompt: '' });
+  // Campaign Date Form State
+  const [challengeDates, setChallengeDates] = useState({ startDate: '', endDate: '' });
+  const [hikingDates, setHikingDates] = useState({ startDate: '', endDate: '' });
+  const [runningDates, setRunningDates] = useState({ startDate: '', endDate: '' });
+
+  // Special Activity Form State
+  const [challengeForm, setChallengeForm] = useState({ title: '', description: '', points: 10, eventDate: '', scanCode: '', proofPrompt: '' });
+  const [hikingForm, setHikingForm] = useState({ title: '', description: '', points: 15, eventDate: '', scanCode: '', proofPrompt: '' });
+  const [runningForm, setRunningForm] = useState({ title: '', description: '', points: 12, eventDate: '', scanCode: '', proofPrompt: '' });
 
   const [categorySelections, setCategorySelections] = useState({});
   const [scanEntries, setScanEntries] = useState({});
@@ -457,7 +463,7 @@ export default function App() {
     if (!title || !description) { setAdminMessage('Activity name and description are required.'); return; }
     try {
       await fetchJson('/api/admin/challenges', { method: 'POST', body: JSON.stringify({ ...challengeForm, points: Number(challengeForm.points) || 10 }) });
-      setChallengeForm({ title: '', description: '', points: 10, scanCode: '', proofPrompt: '' }); setAdminMessage('Special activity saved successfully.'); await refreshAllData(); await refreshAdminData();
+      setChallengeForm({ title: '', description: '', points: 10, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Special activity saved successfully.'); await refreshAllData(); await refreshAdminData();
     } catch (error) { setAdminMessage(error.message || 'Unable to save activity.'); }
   };
 
@@ -466,7 +472,7 @@ export default function App() {
     if (!title || !description) { setAdminMessage('Hiking title and description are required.'); return; }
     try {
       await fetchJson('/api/admin/hiking-challenges', { method: 'POST', body: JSON.stringify({ ...hikingForm, points: Number(hikingForm.points) || 15 }) });
-      setHikingForm({ title: '', description: '', points: 15, scanCode: '', proofPrompt: '' }); setAdminMessage('Hiking activity saved successfully.'); await refreshAllData(); await refreshAdminData();
+      setHikingForm({ title: '', description: '', points: 15, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Hiking activity saved successfully.'); await refreshAllData(); await refreshAdminData();
     } catch (error) { setAdminMessage(error.message || 'Unable to save hiking activity.'); }
   };
 
@@ -475,12 +481,22 @@ export default function App() {
     if (!title || !description) { setAdminMessage('Running title and description are required.'); return; }
     try {
       await fetchJson('/api/admin/running-challenges', { method: 'POST', body: JSON.stringify({ ...runningForm, points: Number(runningForm.points) || 12 }) });
-      setRunningForm({ title: '', description: '', points: 12, scanCode: '', proofPrompt: '' }); setAdminMessage('Running activity saved successfully.'); await refreshAllData(); await refreshAdminData();
+      setRunningForm({ title: '', description: '', points: 12, eventDate: '', scanCode: '', proofPrompt: '' }); setAdminMessage('Running activity saved successfully.'); await refreshAllData(); await refreshAdminData();
     } catch (error) { setAdminMessage(error.message || 'Unable to save running activity.'); }
   };
 
   const handleStartChallenge = async () => {
-    try { const res = await fetchJson('/api/admin/challenge-status/start', { method: 'POST', body: JSON.stringify({ title: 'Active Wellness Challenge Campaign' }) }); setChallengeStatus(res.status); setAdminMessage('New Wellness Challenge campaign started.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+    try {
+      const res = await fetchJson('/api/admin/challenge-status/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Active Wellness Challenge Campaign',
+          startDate: challengeDates.startDate || new Date().toISOString(),
+          endDate: challengeDates.endDate || ''
+        })
+      });
+      setChallengeStatus(res.status); setAdminMessage('New Wellness Challenge campaign started.'); await refreshAllData();
+    } catch (err) { setAdminMessage(err.message); }
   };
 
   const handleEndChallenge = async () => {
@@ -489,7 +505,17 @@ export default function App() {
   };
 
   const handleStartHikingSeason = async () => {
-    try { const res = await fetchJson('/api/admin/hiking-status/start', { method: 'POST', body: JSON.stringify({ title: 'Active Hiking Season Campaign' }) }); setHikingStatus(res.status); setAdminMessage('New Hiking Season started.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+    try {
+      const res = await fetchJson('/api/admin/hiking-status/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Active Hiking Season Campaign',
+          startDate: hikingDates.startDate || new Date().toISOString(),
+          endDate: hikingDates.endDate || ''
+        })
+      });
+      setHikingStatus(res.status); setAdminMessage('New Hiking Season started.'); await refreshAllData();
+    } catch (err) { setAdminMessage(err.message); }
   };
 
   const handleEndHikingSeason = async () => {
@@ -498,7 +524,17 @@ export default function App() {
   };
 
   const handleStartRunningSeason = async () => {
-    try { const res = await fetchJson('/api/admin/running-status/start', { method: 'POST', body: JSON.stringify({ title: 'Active Running Season Campaign' }) }); setRunningStatus(res.status); setAdminMessage('New Running Season started.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+    try {
+      const res = await fetchJson('/api/admin/running-status/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Active Running Season Campaign',
+          startDate: runningDates.startDate || new Date().toISOString(),
+          endDate: runningDates.endDate || ''
+        })
+      });
+      setRunningStatus(res.status); setAdminMessage('New Running Season started.'); await refreshAllData();
+    } catch (err) { setAdminMessage(err.message); }
   };
 
   const handleEndRunningSeason = async () => {
@@ -637,25 +673,39 @@ export default function App() {
     );
   };
 
-  const renderAdminCampaignControls = (campaignStatus, onEnd, onStart, campaignName) => (
-    <div className="campaign-status-card">
-      <div>
-        <span className={`status-badge-pill ${campaignStatus.isActive ? 'status-badge-active' : 'status-badge-ended'}`}>
-          {campaignStatus.isActive ? 'Active Challenge' : 'Ended Challenge'}
-        </span>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
-          {campaignStatus.isActive ? `${campaignName} active` : `${campaignName} currently inactive`}
-        </h2>
-        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-          {campaignStatus.startDate ? `Started: ${new Date(campaignStatus.startDate).toLocaleString()}` : 'Click below to launch campaign.'}
-        </p>
+  const renderAdminCampaignControls = (campaignStatus, onEnd, onStart, campaignName, datesState, setDatesState) => (
+    <div className="campaign-status-card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span className={`status-badge-pill ${campaignStatus.isActive ? 'status-badge-active' : 'status-badge-ended'}`}>
+            {campaignStatus.isActive ? 'Active Challenge' : 'Ended Challenge'}
+          </span>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
+            {campaignStatus.isActive ? `${campaignName} active` : `${campaignName} currently inactive`}
+          </h2>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+            {campaignStatus.startDate ? `Start: ${new Date(campaignStatus.startDate).toLocaleDateString()}` : ''}
+            {campaignStatus.endDate ? ` — End: ${new Date(campaignStatus.endDate).toLocaleDateString()}` : ''}
+          </p>
+        </div>
+        <div>
+          <button type="button" className="secondary-button" style={{ background: '#1e293b', color: '#ffffff', border: 'none' }} onClick={onEnd} disabled={!campaignStatus.isActive}>
+            End Current Campaign
+          </button>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
-        <button type="button" className="secondary-button" style={{ background: '#1e293b', color: '#ffffff', border: 'none' }} onClick={onEnd} disabled={!campaignStatus.isActive}>
-          End Current Campaign
-        </button>
-        <button type="button" className="primary-button" onClick={onStart}>
-          Create New Campaign
+
+      <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '160px' }}>
+          <span className="input-label-bold" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', display: 'block', marginBottom: '0.35rem' }}>Campaign Start Date</span>
+          <input type="date" value={datesState.startDate} onChange={(e) => setDatesState({ ...datesState, startDate: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: '160px' }}>
+          <span className="input-label-bold" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', display: 'block', marginBottom: '0.35rem' }}>Campaign End Date</span>
+          <input type="date" value={datesState.endDate} onChange={(e) => setDatesState({ ...datesState, endDate: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+        </div>
+        <button type="button" className="primary-button" style={{ width: 'auto', padding: '0.6rem 1.25rem', height: '38px' }} onClick={onStart}>
+          Start New Campaign
         </button>
       </div>
     </div>
@@ -743,26 +793,56 @@ export default function App() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const monthName = calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    const events = [];
-    if (challengeStatus.isActive) {
-      events.push({ title: 'Wellness Challenge Campaign', type: 'wellness', date: challengeStatus.startDate ? new Date(challengeStatus.startDate) : new Date() });
-    }
-    if (hikingStatus.isActive) {
-      events.push({ title: 'Hiking Season Campaign', type: 'hiking', date: hikingStatus.startDate ? new Date(hikingStatus.startDate) : new Date() });
-    }
-    if (runningStatus.isActive) {
-      events.push({ title: 'Running Season Campaign', type: 'running', date: runningStatus.startDate ? new Date(runningStatus.startDate) : new Date() });
-    }
+    const isDateInRange = (checkDate, startStr, endStr) => {
+      if (!startStr) return false;
+      const target = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate()).getTime();
+      const s = new Date(startStr);
+      const start = new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime();
+      if (!endStr) return target === start;
+      const e = new Date(endStr);
+      const end = new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime();
+      return target >= start && target <= end;
+    };
 
-    specialChallenges.forEach((sc) => events.push({ title: sc.title, type: 'wellness', points: sc.points, date: new Date() }));
-    hikingChallenges.forEach((hc) => events.push({ title: hc.title, type: 'hiking', points: hc.points, date: new Date() }));
-    runningChallenges.forEach((rc) => events.push({ title: rc.title, type: 'running', points: rc.points, date: new Date() }));
+    const isSameDate = (d1, dateStr) => {
+      if (!dateStr) return false;
+      const d2 = new Date(dateStr);
+      return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+    };
 
     const getDayEvents = (dayNumber) => {
-      return events.filter((ev) => {
-        const d = new Date(ev.date);
-        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === dayNumber;
+      const currentCellDate = new Date(year, month, dayNumber);
+      const events = [];
+
+      if (challengeStatus.isActive && isDateInRange(currentCellDate, challengeStatus.startDate, challengeStatus.endDate)) {
+        events.push({ title: 'Wellness Challenge Campaign', type: 'wellness' });
+      }
+      if (hikingStatus.isActive && isDateInRange(currentCellDate, hikingStatus.startDate, hikingStatus.endDate)) {
+        events.push({ title: 'Hiking Season Campaign', type: 'hiking' });
+      }
+      if (runningStatus.isActive && isDateInRange(currentCellDate, runningStatus.startDate, runningStatus.endDate)) {
+        events.push({ title: 'Running Season Campaign', type: 'running' });
+      }
+
+      specialChallenges.forEach((sc) => {
+        if (sc.eventDate && isSameDate(currentCellDate, sc.eventDate)) {
+          events.push({ title: sc.title, type: 'wellness', points: sc.points });
+        }
       });
+
+      hikingChallenges.forEach((hc) => {
+        if (hc.eventDate && isSameDate(currentCellDate, hc.eventDate)) {
+          events.push({ title: hc.title, type: 'hiking', points: hc.points });
+        }
+      });
+
+      runningChallenges.forEach((rc) => {
+        if (rc.eventDate && isSameDate(currentCellDate, rc.eventDate)) {
+          events.push({ title: rc.title, type: 'running', points: rc.points });
+        }
+      });
+
+      return events;
     };
 
     return (
@@ -1119,7 +1199,7 @@ export default function App() {
 
           {adminTab === 'challenge' && (
             <section className="admin-panel special-challenges-panel">
-              {renderAdminCampaignControls(challengeStatus, handleEndChallenge, handleStartChallenge, 'Wellness Challenge Campaign')}
+              {renderAdminCampaignControls(challengeStatus, handleEndChallenge, handleStartChallenge, 'Wellness Challenge Campaign', challengeDates, setChallengeDates)}
 
               <h4 className="special-activity-section-title">Add Special Activity</h4>
               <div className="special-activity-grid">
@@ -1127,6 +1207,10 @@ export default function App() {
                   <label>
                     <span className="input-label-bold">Activity Name</span>
                     <input type="text" placeholder="10K Steps Sprint" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Activity Date</span>
+                    <input type="date" value={challengeForm.eventDate} onChange={(e) => setChallengeForm({ ...challengeForm, eventDate: e.target.value })} />
                   </label>
                   <label>
                     <span className="input-label-bold">Description</span>
@@ -1145,7 +1229,11 @@ export default function App() {
                   ) : (
                     specialChallenges.map((ch) => (
                       <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
-                        <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#0b41cd' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p></div>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#0b41cd' }}>({ch.points} pts)</small>
+                          {ch.eventDate ? <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Date: {new Date(ch.eventDate).toLocaleDateString()}</span> : null}
+                          <p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p>
+                        </div>
                         <button type="button" className="icon-button delete-button" style={{ color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px' }} onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
@@ -1157,7 +1245,7 @@ export default function App() {
 
           {adminTab === 'hiking' && (
             <section className="admin-panel special-challenges-panel">
-              {renderAdminCampaignControls(hikingStatus, handleEndHikingSeason, handleStartHikingSeason, 'Hiking Season Campaign')}
+              {renderAdminCampaignControls(hikingStatus, handleEndHikingSeason, handleStartHikingSeason, 'Hiking Season Campaign', hikingDates, setHikingDates)}
 
               <h4 className="special-activity-section-title">Add Hiking Trail Activity</h4>
               <div className="special-activity-grid">
@@ -1165,6 +1253,10 @@ export default function App() {
                   <label>
                     <span className="input-label-bold">Hike Title</span>
                     <input type="text" placeholder="Summit Peak Expedition" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Event Date</span>
+                    <input type="date" value={hikingForm.eventDate} onChange={(e) => setHikingForm({ ...hikingForm, eventDate: e.target.value })} />
                   </label>
                   <label>
                     <span className="input-label-bold">Description</span>
@@ -1183,7 +1275,11 @@ export default function App() {
                   ) : (
                     hikingChallenges.map((ch) => (
                       <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
-                        <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#15803d' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p></div>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#15803d' }}>({ch.points} pts)</small>
+                          {ch.eventDate ? <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Date: {new Date(ch.eventDate).toLocaleDateString()}</span> : null}
+                          <p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p>
+                        </div>
                         <button type="button" className="icon-button delete-button" style={{ color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px' }} onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
@@ -1195,7 +1291,7 @@ export default function App() {
 
           {adminTab === 'running' && (
             <section className="admin-panel special-challenges-panel">
-              {renderAdminCampaignControls(runningStatus, handleEndRunningSeason, handleStartRunningSeason, 'Running Season Campaign')}
+              {renderAdminCampaignControls(runningStatus, handleEndRunningSeason, handleStartRunningSeason, 'Running Season Campaign', runningDates, setRunningDates)}
 
               <h4 className="special-activity-section-title">Add Running Session Activity</h4>
               <div className="special-activity-grid">
@@ -1203,6 +1299,10 @@ export default function App() {
                   <label>
                     <span className="input-label-bold">Run Title</span>
                     <input type="text" placeholder="5K Sunrise Interval" value={runningForm.title} onChange={(e) => setRunningForm({ ...runningForm, title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Event Date</span>
+                    <input type="date" value={runningForm.eventDate} onChange={(e) => setRunningForm({ ...runningForm, eventDate: e.target.value })} />
                   </label>
                   <label>
                     <span className="input-label-bold">Description</span>
@@ -1221,7 +1321,11 @@ export default function App() {
                   ) : (
                     runningChallenges.map((ch) => (
                       <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
-                        <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#b45309' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p></div>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#b45309' }}>({ch.points} pts)</small>
+                          {ch.eventDate ? <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Date: {new Date(ch.eventDate).toLocaleDateString()}</span> : null}
+                          <p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p>
+                        </div>
                         <button type="button" className="icon-button delete-button" style={{ color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px' }} onClick={() => handleDeleteRunningActivity(ch.id)}><Trash2 size={16} /></button>
                       </div>
                     ))
@@ -1265,7 +1369,7 @@ export default function App() {
                               <strong style={{ color: '#0f172a' }}>{post.author} <small style={{ color: '#64748b' }}>({post.isAnnouncement ? 'Announcement' : 'User post'})</small></strong>
                               <div style={{ display: 'flex', gap: '0.25rem' }}>
                                 <button type="button" className="icon-button edit-button" onClick={() => { setEditingCommunityId(post.id); setEditingCommunityDraft({ message: post.message }); }}><Edit size={14} /></button>
-                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={16} /></button>
+                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={14} /></button>
                               </div>
                             </div>
                             <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
