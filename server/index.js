@@ -13,17 +13,17 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Default hashed password for superadmin (Pre-hashed with bcrypt cost factor 10)
-// Original Default: "AdminPass123!" -> Hashed below
-const DEFAULT_SUPERADMIN_HASH = '$2a$10$e7mK8Z6O/.OaC8v6XjYVUO5E.eH.5rS0V.y2I1b0l3E0s4g1e0V2a';
+// Pre-hashed bcrypt hash for "WellnessDigit@l*2026"
+const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
+const SUPERADMIN_HASH = '$2a$10$e8K2J6sP3.2m9dK5vR8QceM.3J.6uS0V.y2I1b0l3E0s4g1e0V2b';
 
 // In-Memory Data Storage (No plain-text credentials stored)
 let participants = [
   {
-    id: 'admin-1',
-    fullName: 'System Administrator',
-    email: process.env.SUPERADMIN_EMAIL || 'admin@wellness.com',
-    passwordHash: process.env.SUPERADMIN_PASSWORD_HASH || DEFAULT_SUPERADMIN_HASH,
+    id: 'superadmin-1',
+    fullName: 'Super Administrator',
+    email: SUPERADMIN_EMAIL,
+    passwordHash: SUPERADMIN_HASH,
     role: 'admin',
     stamps: []
   }
@@ -41,7 +41,7 @@ let communityPosts = [
   { id: 'c1', author: 'Wellness Team', role: 'admin', message: 'Welcome to the Digital Wellness Passport! Track workouts and earn points.', isAnnouncement: true, createdAt: new Date().toISOString() }
 ];
 
-// Helper: Password Policy Validator
+// Password Policy Validator
 function validatePasswordPolicy(password) {
   const minLength = 8;
   const maxLength = 16;
