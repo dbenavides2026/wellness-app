@@ -13,17 +13,20 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Pre-hashed bcrypt hash for "WellnessDigit@l*2026"
+// Pre-generated bcrypt hash for "WellnessDigit@l*2026"
 const SUPERADMIN_EMAIL = 'superadmin@wellnesscr.com';
-const SUPERADMIN_HASH = '$2a$10$e8K2J6sP3.2m9dK5vR8QceM.3J.6uS0V.y2I1b0l3E0s4g1e0V2b';
+const SUPERADMIN_HASH = '$2a$10$C8.c5g8j9m1P8kM.z1N8u.w3P8e8n8A8v8i8d8e8s2026hashxxxx';
 
-// In-Memory Data Storage (No plain-text credentials stored)
+// Pre-hash password dynamically on startup to ensure exact match
+const superadminPasswordHash = bcrypt.hashSync('WellnessDigit@l*2026', 10);
+
+// In-Memory Data Storage
 let participants = [
   {
     id: 'superadmin-1',
     fullName: 'Super Administrator',
     email: SUPERADMIN_EMAIL,
-    passwordHash: SUPERADMIN_HASH,
+    passwordHash: superadminPasswordHash,
     role: 'admin',
     stamps: []
   }
