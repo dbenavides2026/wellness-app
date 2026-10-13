@@ -35,12 +35,10 @@ const categories = [
   { id: 'sports', title: 'Sports & Outdoor Game', points: 2, iconType: 'trophy', scanCode: 'WELLNESS-SPORTS-303', proofPrompt: 'Upload a photo of your activity, match, or hike.' }
 ];
 
-// Hiking Club Expedition updated to 1 point
 const hikingCategories = [
   { id: 'hiking-club-checkin', title: 'Hiking Club Expedition', points: 1, iconType: 'mountain', scanCode: 'HIKING-CLUB-101', proofPrompt: 'Upload a photo from your trail or summit check-in.' }
 ];
 
-// Running Club Session updated to 1 point
 const runningCategories = [
   { id: 'running-club-checkin', title: 'Running Club Session', points: 1, iconType: 'trophy', scanCode: 'RUNNING-CLUB-101', proofPrompt: 'Upload a photo from your running session.' }
 ];
@@ -76,7 +74,6 @@ export default function App() {
   const [registerForm, setRegisterForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
   const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
   const [activePortalTab, setActivePortalTab] = useState('home');
-  const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [adminTab, setAdminTab] = useState('admin');
   const [authMessage, setAuthMessage] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
@@ -396,11 +393,6 @@ export default function App() {
 
   const handleAdminLogout = () => { setAdminUser(null); setScreen('login'); setAdminMessage(''); };
 
-  const handleCommunityImageUpload = (file) => {
-    if (!file) return;
-    setCommunityDraft((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
-  };
-
   const handleCommunityPostSubmit = () => {
     const message = communityDraft.message.trim();
     if (!message && !communityDraft.image) return;
@@ -494,16 +486,16 @@ export default function App() {
     else if (isSpecial) { Icon = Sparkles; badgeBg = 'rgba(245, 158, 11, 0.12)'; badgeColor = '#b45309'; }
 
     return (
-      <article key={category.id} className="category-card">
-        <div className="card-topline">
-          <div className="category-title-wrap">
+      <article key={category.id} className="category-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', marginBottom: '1rem' }}>
+        <div className="card-topline" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="category-title-wrap" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div className="icon-badge" style={{ background: badgeBg, color: badgeColor }}><Icon className="category-icon" /></div>
-            <div><h2>{category.title}</h2><p>+{category.points} point{category.points > 1 ? 's' : ''}</p></div>
+            <div><h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.1rem' }}>{category.title}</h2><p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>+{category.points} point{category.points > 1 ? 's' : ''}</p></div>
           </div>
           <span className={`status-pill ${isReady ? 'success' : 'pending'}`}>{isReady ? <CheckCircle2 className="status-icon" /> : <Camera className="status-icon" />}{isReady ? 'Ready' : 'Proof required'}</span>
         </div>
-        {category.description && <p style={{ margin: '0.5rem 0 1rem 0', color: '#475569', fontSize: '0.9rem' }}>{category.description}</p>}
-        <div className="method-toggle">
+        {category.description && <p style={{ margin: '0.75rem 0 1rem 0', color: '#475569', fontSize: '0.9rem' }}>{category.description}</p>}
+        <div className="method-toggle" style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
           <button type="button" className={method === 'scan' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'scan' } }))}><ScanLine className="button-icon" /> Scan code</button>
           <button type="button" className={method === 'upload' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }))}><Upload className="button-icon" /> Upload proof</button>
         </div>
@@ -810,7 +802,7 @@ export default function App() {
                   <div className="header-topline">
                     <div>
                       <p className="eyebrow">Digital Wellness Passport</p>
-                      <h1>Welcome, {currentUser?.fullName || 'Participant'}</h1>
+                      <h1 style={{ color: '#0f172a' }}>Welcome, {currentUser?.fullName || 'Participant'}</h1>
                     </div>
                     <div className="header-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                       <button type="button" className="secondary-button" onClick={() => setProfileOpen(true)}><User size={16} /> My Profile</button>
@@ -850,26 +842,28 @@ export default function App() {
             {activePortalTab === 'passport' && (
               <>
                 <header className="passport-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2>Wellness Challenge Activities</h2>
+                  <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Wellness Challenge Activities</h2>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button type="button" className="secondary-button" onClick={() => setProfileOpen(true)}><User size={16} /> My Profile</button>
                     <button type="button" className="logout-button" onClick={handleLogout}><LogOut className="button-icon" /> Log out</button>
                   </div>
                 </header>
 
-                <main className="category-list">
-                  {categories.map((category) => renderActivityCard(category, challengeStatus.isActive))}
-                </main>
+                <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <main className="category-list">
+                    {categories.map((category) => renderActivityCard(category, challengeStatus.isActive))}
+                  </main>
+                </section>
 
-                <section className="challenge-panel" style={{ marginTop: '2rem' }}>
-                  <div className="section-heading"><h3>Special Activities</h3></div>
+                <section className="challenge-panel" style={{ marginTop: '2rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Special Activities</h3></div>
                   <main className="category-list" style={{ marginTop: '1rem' }}>
                     {specialChallenges.map((challenge) => renderActivityCard(challenge, challengeStatus.isActive, true))}
                   </main>
                 </section>
 
                 <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-                  <div className="section-heading"><h3>Wellness Challenge Stamp History</h3></div>
+                  <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Wellness Challenge Stamp History</h3></div>
                   {renderStampHistory(wellnessStamps)}
                 </section>
               </>
@@ -879,28 +873,30 @@ export default function App() {
             {activePortalTab === 'hiking' && (
               <>
                 <header className="passport-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2>Hiking Club Expeditions</h2>
+                  <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Hiking Club Expeditions</h2>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button type="button" className="secondary-button" onClick={() => setProfileOpen(true)}><User size={16} /> My Profile</button>
                     <button type="button" className="logout-button" onClick={handleLogout}><LogOut className="button-icon" /> Log out</button>
                   </div>
                 </header>
 
-                <main className="category-list">
-                  {hikingCategories.map((category) => renderActivityCard(category, hikingStatus.isActive))}
-                </main>
+                <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <main className="category-list">
+                    {hikingCategories.map((category) => renderActivityCard(category, hikingStatus.isActive))}
+                  </main>
 
-                {hikingChallenges.length > 0 && (
-                  <section className="challenge-panel" style={{ marginTop: '2rem' }}>
-                    <div className="section-heading"><h3>Scheduled Trails & Peaks</h3></div>
-                    <main className="category-list" style={{ marginTop: '1rem' }}>
-                      {hikingChallenges.map((challenge) => renderActivityCard(challenge, hikingStatus.isActive, true))}
-                    </main>
-                  </section>
-                )}
+                  {hikingChallenges.length > 0 && (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Scheduled Trails & Peaks</h3></div>
+                      <main className="category-list" style={{ marginTop: '1rem' }}>
+                        {hikingChallenges.map((challenge) => renderActivityCard(challenge, hikingStatus.isActive, true))}
+                      </main>
+                    </div>
+                  )}
+                </section>
 
                 <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-                  <div className="section-heading"><h3>Hiking Club Stamp History</h3></div>
+                  <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Hiking Club Stamp History</h3></div>
                   {renderStampHistory(hikingStamps)}
                 </section>
               </>
@@ -910,28 +906,30 @@ export default function App() {
             {activePortalTab === 'running' && (
               <>
                 <header className="passport-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2>Running Club Sessions</h2>
+                  <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Running Club Sessions</h2>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button type="button" className="secondary-button" onClick={() => setProfileOpen(true)}><User size={16} /> My Profile</button>
                     <button type="button" className="logout-button" onClick={handleLogout}><LogOut className="button-icon" /> Log out</button>
                   </div>
                 </header>
 
-                <main className="category-list">
-                  {runningCategories.map((category) => renderActivityCard(category, runningStatus.isActive))}
-                </main>
+                <section className="activity-section-wrapper" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <main className="category-list">
+                    {runningCategories.map((category) => renderActivityCard(category, runningStatus.isActive))}
+                  </main>
 
-                {runningChallenges.length > 0 && (
-                  <section className="challenge-panel" style={{ marginTop: '2rem' }}>
-                    <div className="section-heading"><h3>Scheduled Running Events</h3></div>
-                    <main className="category-list" style={{ marginTop: '1rem' }}>
-                      {runningChallenges.map((challenge) => renderActivityCard(challenge, runningStatus.isActive, true))}
-                    </main>
-                  </section>
-                )}
+                  {runningChallenges.length > 0 && (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Scheduled Running Events</h3></div>
+                      <main className="category-list" style={{ marginTop: '1rem' }}>
+                        {runningChallenges.map((challenge) => renderActivityCard(challenge, runningStatus.isActive, true))}
+                      </main>
+                    </div>
+                  )}
+                </section>
 
                 <section className="stamp-panel" style={{ marginTop: '2rem' }}>
-                  <div className="section-heading"><h3>Running Club Stamp History</h3></div>
+                  <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Running Club Stamp History</h3></div>
                   {renderStampHistory(runningStamps)}
                 </section>
               </>
@@ -940,7 +938,7 @@ export default function App() {
             {/* WELLNESS COMMUNITY TAB */}
             {activePortalTab === 'community' && (
               <section className="community-panel">
-                <div className="section-heading"><h3>Wellness Community</h3></div>
+                <div className="section-heading"><h3 style={{ color: '#0f172a' }}>Wellness Community</h3></div>
                 <div className="community-composer">
                   <textarea value={communityDraft.message} onChange={(e) => setCommunityDraft((p) => ({ ...p, message: e.target.value }))} placeholder="Share an update..." />
                   <button type="button" className="primary-button small-action" onClick={handleCommunityPostSubmit}>Post update</button>
