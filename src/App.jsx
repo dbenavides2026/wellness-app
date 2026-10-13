@@ -22,7 +22,9 @@ import {
   Users,
   Mountain,
   User,
-  Home as HomeIcon
+  Home as HomeIcon,
+  Download,
+  ShieldAlert
 } from 'lucide-react';
 import './App.css';
 
@@ -55,6 +57,7 @@ export default function App() {
   const [adminStats, setAdminStats] = useState({ stats: {}, recentActivity: [] });
   const [adminQrCodes, setAdminQrCodes] = useState([]);
   const [adminReport, setAdminReport] = useState([]);
+  const [reportCategory, setReportCategory] = useState('all');
   const [editingParticipantId, setEditingParticipantId] = useState(null);
   const [editingParticipantDraft, setEditingParticipantDraft] = useState({ fullName: '', email: '', role: 'participant' });
   const [adminCommunityPosts, setAdminCommunityPosts] = useState([]);
@@ -240,13 +243,7 @@ export default function App() {
 
         await fetchJson('/api/admin/community', {
           method: 'POST',
-          body: JSON.stringify({
-            author: currentUser.fullName,
-            role: 'participant',
-            message: autoMessage,
-            image: imageProof,
-            isAnnouncement: false
-          })
+          body: JSON.stringify({ author: currentUser.fullName, role: 'participant', message: autoMessage, image: imageProof, isAnnouncement: false })
         }).catch((err) => console.error('Auto community post error:', err));
 
         await refreshAllData();
@@ -418,25 +415,17 @@ export default function App() {
     const role = currentUser ? 'participant' : adminUser?.role || 'participant';
 
     try {
-      await fetchJson('/api/admin/community', {
-        method: 'POST',
-        body: JSON.stringify({ author, role, message, image: communityDraft.image, isAnnouncement: false })
-      });
+      await fetchJson('/api/admin/community', { method: 'POST', body: JSON.stringify({ author, role, message, image: communityDraft.image, isAnnouncement: false }) });
       setCommunityDraft({ message: '', image: '' });
       await refreshAllData();
-    } catch (err) {
-      console.error('Community submit error:', err);
-    }
+    } catch (err) { console.error('Community submit error:', err); }
   };
 
   const handleAdminCommunityPostSubmit = async () => {
     const message = adminCommunityDraft.message.trim();
     if (!message && !adminCommunityDraft.image) { setAdminMessage('Add a message or photo to publish an update.'); return; }
     try {
-      await fetchJson('/api/admin/community', {
-        method: 'POST',
-        body: JSON.stringify({ author: 'Wellness Team', role: 'admin', message, image: adminCommunityDraft.image, isAnnouncement: adminCommunityDraft.isAnnouncement })
-      });
+      await fetchJson('/api/admin/community', { method: 'POST', body: JSON.stringify({ author: 'Wellness Team', role: 'admin', message, image: adminCommunityDraft.image, isAnnouncement: adminCommunityDraft.isAnnouncement }) });
       setAdminCommunityDraft({ message: '', image: '', isAnnouncement: true });
       setAdminMessage('Community update published successfully.');
       await refreshAllData();
@@ -445,27 +434,17 @@ export default function App() {
 
   const handleSaveCommunityEdit = async (id) => {
     try {
-      await fetchJson(`/api/admin/community/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ message: editingCommunityDraft.message })
-      });
-      setEditingCommunityId(null);
-      setAdminMessage('Community announcement updated.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to update announcement.');
-    }
+      await fetchJson(`/api/admin/community/${id}`, { method: 'PUT', body: JSON.stringify({ message: editingCommunityDraft.message }) });
+      setEditingCommunityId(null); setAdminMessage('Community announcement updated.'); await refreshAllData();
+    } catch (error) { setAdminMessage(error.message || 'Unable to update announcement.'); }
   };
 
   const handleDeleteCommunityPost = async (id) => {
     if (!window.confirm('Delete this community post?')) return;
     try {
       await fetchJson(`/api/admin/community/${id}`, { method: 'DELETE' });
-      setAdminMessage('Post deleted.');
-      await refreshAllData();
-    } catch (error) {
-      setAdminMessage(error.message || 'Unable to delete post.');
-    }
+      setAdminMessage('Post deleted.'); await refreshAllData();
+    } catch (error) { setAdminMessage(error.message || 'Unable to delete post.'); }
   };
 
   const handleSaveSpecialChallenge = async () => {
@@ -520,6 +499,35 @@ export default function App() {
   const handleEndRunningSeason = async () => {
     if (!window.confirm('Ending this campaign will reset all Running Club points and stamps. Proceed?')) return;
     try { const res = await fetchJson('/api/admin/running-status/end', { method: 'POST' }); setRunningStatus(res.status); setAdminMessage('Running Season ended. Points reset.'); await refreshAllData(); } catch (err) { setAdminMessage(err.message); }
+  };
+
+  const exportCategoryReportCsv = () => {
+    const filterFn = reportCategory === 'wellness' 
+      ? (s) => !s.scanCode?.startsWith('HIKING-') && !s.scanCode?.startsWith('RUNNING-')
+      : reportCategory === 'hiking' 
+      ? (s) => s.scanCode?.startsWith('HIKING-')
+      : reportCategory === 'running'
+      ? (s) => s.scanCode?.startsWith('RUNNING-')
+      : () => true;
+
+    const rows = participants.map((p) => {
+      const filteredStamps = (p.stamps || []).filter(filterFn);
+      const points = filteredStamps.reduce((s, st) => s + Number(st.points || 0), 0);
+      const lastAct = filteredStamps.length ? new Date(filteredStamps[0].date).toLocaleString() : 'No activity';
+      return [p.fullName, p.email, filteredStamps.length, points, lastAct];
+    });
+
+    const csvContent = [['Name', 'Email', 'Stamps', 'Points', 'Last Activity'], ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `participants-report-${reportCategory}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const getStampBadge = (title) => {
@@ -657,6 +665,14 @@ export default function App() {
     const maxHikingPts = Math.max(...topHikingUsers.map(u => u.points), 1);
     const maxRunningPts = Math.max(...topRunningUsers.map(u => u.points), 1);
 
+    const filterFn = reportCategory === 'wellness' 
+      ? (s) => !s.scanCode?.startsWith('HIKING-') && !s.scanCode?.startsWith('RUNNING-')
+      : reportCategory === 'hiking' 
+      ? (s) => s.scanCode?.startsWith('HIKING-')
+      : reportCategory === 'running'
+      ? (s) => s.scanCode?.startsWith('RUNNING-')
+      : () => true;
+
     return (
       <div className="admin-app"><div className="admin-shell">
         <header className="admin-header">
@@ -667,6 +683,7 @@ export default function App() {
         <nav className="admin-top-nav">
           <button type="button" className={adminTab === 'admin' ? 'active' : ''} onClick={() => setAdminTab('admin')}>Overview</button>
           <button type="button" className={adminTab === 'users' ? 'active' : ''} onClick={() => setAdminTab('users')}>User management</button>
+          <button type="button" className={adminTab === 'reports' ? 'active' : ''} onClick={() => setAdminTab('reports')}>Participants Report</button>
           <button type="button" className={adminTab === 'challenge' ? 'active' : ''} onClick={() => setAdminTab('challenge')}>Manage Wellness Challenge</button>
           <button type="button" className={adminTab === 'hiking' ? 'active' : ''} onClick={() => setAdminTab('hiking')}>Manage Hiking Club</button>
           <button type="button" className={adminTab === 'running' ? 'active' : ''} onClick={() => setAdminTab('running')}>Manage Running Club</button>
@@ -734,25 +751,143 @@ export default function App() {
           </>
         )}
 
+        {/* USER MANAGEMENT STRUCTURED TABLE */}
         {adminTab === 'users' && (
           <section className="admin-panel assignment-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-            <h3 style={{ color: '#0f172a', margin: '0 0 1.25rem 0' }}>Registered Account Management</h3>
-            <div className="participant-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {participants.map((p) => (
-                <div key={p.id} className="participant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                  <div>
-                    <strong style={{ color: '#0f172a', fontSize: '0.95rem' }}>{p.fullName}</strong> 
-                    <small style={{ color: '#0b41cd', fontWeight: 'bold', marginLeft: '0.5rem' }}>({p.role || 'participant'})</small>
-                    <br/>
-                    <small style={{ color: '#475569', fontSize: '0.85rem' }}>{p.email}</small>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {p.role !== 'admin' && <button type="button" className="small-button" onClick={() => promoteParticipantToAdmin(p)}>Assign admin</button>}
-                    <button type="button" className="icon-button edit-button" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.4rem', borderRadius: '6px', color: '#0f172a' }} onClick={() => { setEditingParticipantId(p.id); setEditingParticipantDraft({ fullName: p.fullName, email: p.email, role: p.role || 'participant' }); }}><Edit size={16} /></button>
-                    <button type="button" className="icon-button delete-button" style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px', color: '#dc2626' }} onClick={() => handleDeleteUser(p.id)}><Trash2 size={16} /></button>
-                  </div>
-                </div>
-              ))}
+            <h3 style={{ color: '#0f172a', margin: '0 0 1.25rem 0' }}>User Management</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Name</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Role</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Email</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {participants.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '0.85rem 1rem', color: '#0f172a', fontWeight: 'bold' }}>{p.fullName}</td>
+                      <td style={{ padding: '0.85rem 1rem' }}>
+                        <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', background: p.role === 'admin' ? '#eff6ff' : '#f1f5f9', color: p.role === 'admin' ? '#0b41cd' : '#475569' }}>
+                          {p.role || 'participant'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', color: '#475569' }}>{p.email}</td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                          {p.role !== 'admin' && (
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', height: '32px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              onClick={() => promoteParticipantToAdmin(p)}
+                            >
+                              <ShieldAlert size={14} /> Make Admin
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="icon-button edit-button"
+                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.4rem', borderRadius: '6px', color: '#0f172a', height: '32px', width: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={() => { setEditingParticipantId(p.id); setEditingParticipantDraft({ fullName: p.fullName, email: p.email, role: p.role || 'participant' }); }}
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button delete-button"
+                            style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px', color: '#dc2626', height: '32px', width: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={() => handleDeleteUser(p.id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* PARTICIPANTS REPORT PER CATEGORY TABLE & CSV EXPORT */}
+        {adminTab === 'reports' && (
+          <section className="admin-panel report-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ color: '#0f172a', margin: 0 }}>Participants Report</h3>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>Filter performance statistics by activity category.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <select
+                  value={reportCategory}
+                  onChange={(e) => setReportCategory(e.target.value)}
+                  style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', color: '#0f172a', fontWeight: 'bold' }}
+                >
+                  <option value="all">All Categories</option>
+                  <option value="wellness">Wellness Challenge</option>
+                  <option value="hiking">Hiking Club</option>
+                  <option value="running">Running Club</option>
+                </select>
+                <button type="button" className="primary-button" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={exportCategoryReportCsv}>
+                  <Download size={16} /> Export to CSV
+                </button>
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Name</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Email</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Stamps</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Points</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>Last Activity</th>
+                    <th style={{ padding: '0.75rem 1rem', color: '#0f172a', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {participants.map((p) => {
+                    const filteredStamps = (p.stamps || []).filter(filterFn);
+                    const pts = filteredStamps.reduce((s, st) => s + Number(st.points || 0), 0);
+                    const lastAct = filteredStamps.length ? new Date(filteredStamps[0].date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'No activity';
+
+                    return (
+                      <tr key={p.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '0.85rem 1rem', color: '#0f172a', fontWeight: 'bold' }}>{p.fullName}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#475569' }}>{p.email}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#0f172a', fontWeight: 'bold' }}>{filteredStamps.length}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#0b41cd', fontWeight: 'bold' }}>{pts} pts</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#64748b', fontSize: '0.85rem' }}>{lastAct}</td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                            <button
+                              type="button"
+                              className="icon-button edit-button"
+                              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.4rem', borderRadius: '6px', color: '#0f172a', height: '32px', width: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                              onClick={() => { setEditingParticipantId(p.id); setEditingParticipantDraft({ fullName: p.fullName, email: p.email, role: p.role || 'participant' }); }}
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-button delete-button"
+                              style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px', color: '#dc2626', height: '32px', width: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                              onClick={() => handleDeleteUser(p.id)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </section>
         )}
