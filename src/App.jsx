@@ -29,8 +29,10 @@ import {
   QrCode,
   MessageSquare,
   PieChart as PieChartIcon,
-  RotateCcw,
-  Image as ImageIcon
+  ImageIcon,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import './App.css';
 
@@ -114,6 +116,8 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ fullName: '', email: '', password: '', profileImage: '' });
   const [profileMsg, setProfileMsg] = useState('');
+
+  const [calendarDate, setCalendarDate] = useState(new Date());
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -542,12 +546,9 @@ export default function App() {
 
   const renderStampHistoryCard = (stampList) => {
     return (
-      <div className="stamp-card-container">
-        <div className="stamp-card-header">
+      <section className="section-card-container">
+        <div className="section-card-header">
           <h3 className="section-title-bold">Stamp History</h3>
-          <button type="button" className="reset-history-button" onClick={() => refreshAllData()}>
-            <RotateCcw size={14} /> Reset
-          </button>
         </div>
 
         {!stampList || stampList.length === 0 ? (
@@ -571,7 +572,7 @@ export default function App() {
             })}
           </div>
         )}
-      </div>
+      </section>
     );
   };
 
@@ -731,6 +732,91 @@ export default function App() {
           </div>
         </div>
       </div>
+    );
+  };
+
+  const renderHomeCampaignCalendar = () => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthName = calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const events = [];
+    if (challengeStatus.isActive) {
+      events.push({ title: 'Wellness Challenge Campaign', type: 'wellness', date: challengeStatus.startDate ? new Date(challengeStatus.startDate) : new Date() });
+    }
+    if (hikingStatus.isActive) {
+      events.push({ title: 'Hiking Season Campaign', type: 'hiking', date: hikingStatus.startDate ? new Date(hikingStatus.startDate) : new Date() });
+    }
+    if (runningStatus.isActive) {
+      events.push({ title: 'Running Season Campaign', type: 'running', date: runningStatus.startDate ? new Date(runningStatus.startDate) : new Date() });
+    }
+
+    specialChallenges.forEach((sc) => events.push({ title: sc.title, type: 'wellness', points: sc.points, date: new Date() }));
+    hikingChallenges.forEach((hc) => events.push({ title: hc.title, type: 'hiking', points: hc.points, date: new Date() }));
+    runningChallenges.forEach((rc) => events.push({ title: rc.title, type: 'running', points: rc.points, date: new Date() }));
+
+    const getDayEvents = (dayNumber) => {
+      return events.filter((ev) => {
+        const d = new Date(ev.date);
+        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === dayNumber;
+      });
+    };
+
+    return (
+      <section className="section-card-container" style={{ marginTop: '1.5rem' }}>
+        <div className="section-card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CalendarIcon size={20} color="#0b41cd" />
+            <h3 className="section-title-bold" style={{ margin: 0 }}>Campaigns & Activities Calendar</h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{monthName}</span>
+            <button type="button" className="icon-button" style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '0.3rem', cursor: 'pointer' }} onClick={() => setCalendarDate(new Date(year, month - 1, 1))}>
+              <ChevronLeft size={16} />
+            </button>
+            <button type="button" className="icon-button" style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '0.3rem', cursor: 'pointer' }} onClick={() => setCalendarDate(new Date(year, month + 1, 1))}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="calendar-grid">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+            <div key={d} className="calendar-day-header">{d}</div>
+          ))}
+
+          {Array.from({ length: firstDayIndex }).map((_, i) => (
+            <div key={`empty-${i}`} className="calendar-day empty" />
+          ))}
+
+          {Array.from({ length: daysInMonth }).map((_, idx) => {
+            const dayNum = idx + 1;
+            const dayEvs = getDayEvents(dayNum);
+            const isToday = dayNum === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear();
+
+            return (
+              <div key={dayNum} className={`calendar-day ${isToday ? 'today' : ''}`}>
+                <span className="calendar-date-number">{dayNum}</span>
+                <div className="calendar-events-list">
+                  {dayEvs.map((ev, eIdx) => {
+                    const badgeBg = ev.type === 'hiking' ? '#dcfce7' : ev.type === 'running' ? '#fffbeb' : '#eff6ff';
+                    const badgeColor = ev.type === 'hiking' ? '#15803d' : ev.type === 'running' ? '#b45309' : '#0b41cd';
+
+                    return (
+                      <span key={eIdx} className="calendar-event-pill" style={{ background: badgeBg, color: badgeColor }}>
+                        {ev.title}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     );
   };
 
@@ -1179,7 +1265,7 @@ export default function App() {
                               <strong style={{ color: '#0f172a' }}>{post.author} <small style={{ color: '#64748b' }}>({post.isAnnouncement ? 'Announcement' : 'User post'})</small></strong>
                               <div style={{ display: 'flex', gap: '0.25rem' }}>
                                 <button type="button" className="icon-button edit-button" onClick={() => { setEditingCommunityId(post.id); setEditingCommunityDraft({ message: post.message }); }}><Edit size={14} /></button>
-                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={14} /></button>
+                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={16} /></button>
                               </div>
                             </div>
                             <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
@@ -1293,6 +1379,9 @@ export default function App() {
                 </div>
               </div>
             </header>
+
+            {/* DYNAMIC CALENDAR FOR CAMPAIGNS & ACTIVITIES */}
+            {renderHomeCampaignCalendar()}
           </section>
         )}
 
@@ -1309,12 +1398,14 @@ export default function App() {
               </main>
             </section>
 
-            <section className="challenge-panel" style={{ marginTop: '2rem' }}>
-              <div className="section-heading"><h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Special Activities</h3></div>
-              <main className="category-list">
-                {specialChallenges.map((challenge) => renderActivityCard(challenge, challengeStatus.isActive, true))}
-              </main>
-            </section>
+            {specialChallenges.length > 0 && (
+              <section className="section-card-container" style={{ marginTop: '2rem' }}>
+                <div className="section-card-header"><h3 className="section-title-bold">Special Activities</h3></div>
+                <main className="category-list" style={{ marginTop: '1rem' }}>
+                  {specialChallenges.map((challenge) => renderActivityCard(challenge, challengeStatus.isActive, true))}
+                </main>
+              </section>
+            )}
 
             <section style={{ marginTop: '2rem' }}>
               {renderStampHistoryCard(wellnessStamps)}
@@ -1384,9 +1475,6 @@ export default function App() {
             <div className="community-composer-card">
               <div className="community-card-header">
                 <h3 className="section-title-bold">Wellness Community</h3>
-                <button type="button" className="secondary-button" style={{ width: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.85rem' }} onClick={() => setActivePortalTab('home')}>
-                  Return to dashboard
-                </button>
               </div>
               
               <textarea
