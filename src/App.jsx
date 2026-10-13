@@ -32,7 +32,9 @@ import {
   ImageIcon,
   Calendar as CalendarIcon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import './App.css';
 
@@ -88,6 +90,10 @@ export default function App() {
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+  const [showProfilePassword, setShowProfilePassword] = useState(false);
+
   const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
   const [activePortalTab, setActivePortalTab] = useState('home');
   const [adminTab, setAdminTab] = useState('admin');
@@ -933,8 +939,28 @@ export default function App() {
         <form className="auth-form" onSubmit={handleRegister}>
           <label><span className="input-label">Full name</span><input type="text" value={registerForm.fullName} onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })} required /></label>
           <label><span className="input-label">Email</span><input type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} required /></label>
-          <label><span className="input-label">Password</span><input type="password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} required /></label>
-          <label><span className="input-label">Confirm password</span><input type="password" value={registerForm.confirmPassword} onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })} required /></label>
+          
+          <label>
+            <span className="input-label">Password</span>
+            <div style={{ position: 'relative' }}>
+              <input type={showRegPassword ? 'text' : 'password'} value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} required />
+              <button type="button" className="eye-toggle-btn" onClick={() => setShowRegPassword(!showRegPassword)}>
+                {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Must be 8-16 chars, contain 1 uppercase, 1 number, & 1 special char.</span>
+          </label>
+
+          <label>
+            <span className="input-label">Confirm password</span>
+            <div style={{ position: 'relative' }}>
+              <input type={showRegConfirmPassword ? 'text' : 'password'} value={registerForm.confirmPassword} onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })} required />
+              <button type="button" className="eye-toggle-btn" onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}>
+                {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </label>
+
           {registrationMessage && <p className="auth-message error">{registrationMessage}</p>}
           <button type="submit" className="primary-button"><UserPlus className="button-icon" /> Register participant</button>
         </form>
@@ -1369,7 +1395,7 @@ export default function App() {
                               <strong style={{ color: '#0f172a' }}>{post.author} <small style={{ color: '#64748b' }}>({post.isAnnouncement ? 'Announcement' : 'User post'})</small></strong>
                               <div style={{ display: 'flex', gap: '0.25rem' }}>
                                 <button type="button" className="icon-button edit-button" onClick={() => { setEditingCommunityId(post.id); setEditingCommunityDraft({ message: post.message }); }}><Edit size={14} /></button>
-                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={14} /></button>
+                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={16} /></button>
                               </div>
                             </div>
                             <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
@@ -1497,176 +1523,3 @@ export default function App() {
             </header>
 
             <section className="activity-section-wrapper">
-              <main className="category-list">
-                {categories.map((category) => renderActivityCard(category, challengeStatus.isActive))}
-              </main>
-            </section>
-
-            {specialChallenges.length > 0 && (
-              <section className="section-card-container" style={{ marginTop: '2rem' }}>
-                <div className="section-card-header"><h3 className="section-title-bold">Special Activities</h3></div>
-                <main className="category-list" style={{ marginTop: '1rem' }}>
-                  {specialChallenges.map((challenge) => renderActivityCard(challenge, challengeStatus.isActive, true))}
-                </main>
-              </section>
-            )}
-
-            <section style={{ marginTop: '2rem' }}>
-              {renderStampHistoryCard(wellnessStamps)}
-            </section>
-          </>
-        )}
-
-        {/* HIKING CLUB TAB */}
-        {activePortalTab === 'hiking' && (
-          <>
-            <header className="passport-header" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Hiking Club Expeditions</h2>
-            </header>
-
-            <section className="activity-section-wrapper">
-              <main className="category-list">
-                {hikingCategories.map((category) => renderActivityCard(category, hikingStatus.isActive))}
-              </main>
-
-              {hikingChallenges.length > 0 && (
-                <div style={{ marginTop: '1.5rem' }}>
-                  <div className="section-heading"><h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Scheduled Trails & Peaks</h3></div>
-                  <main className="category-list">
-                    {hikingChallenges.map((challenge) => renderActivityCard(challenge, hikingStatus.isActive, true))}
-                  </main>
-                </div>
-              )}
-            </section>
-
-            <section style={{ marginTop: '2rem' }}>
-              {renderStampHistoryCard(hikingStamps)}
-            </section>
-          </>
-        )}
-
-        {/* RUNNING CLUB TAB */}
-        {activePortalTab === 'running' && (
-          <>
-            <header className="passport-header" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Running Club Sessions</h2>
-            </header>
-
-            <section className="activity-section-wrapper">
-              <main className="category-list">
-                {runningCategories.map((category) => renderActivityCard(category, runningStatus.isActive))}
-              </main>
-
-              {runningChallenges.length > 0 && (
-                <div style={{ marginTop: '1.5rem' }}>
-                  <div className="section-heading"><h3 style={{ color: '#0f172a', marginBottom: '1rem' }}>Scheduled Running Events</h3></div>
-                  <main className="category-list">
-                    {runningChallenges.map((challenge) => renderActivityCard(challenge, runningStatus.isActive, true))}
-                  </main>
-                </div>
-              )}
-            </section>
-
-            <section style={{ marginTop: '2rem' }}>
-              {renderStampHistoryCard(runningStamps)}
-            </section>
-          </>
-        )}
-
-        {/* WELLNESS COMMUNITY TAB */}
-        {activePortalTab === 'community' && (
-          <section className="community-panel">
-            <div className="community-composer-card">
-              <div className="community-card-header">
-                <h3 className="section-title-bold">Wellness Community</h3>
-              </div>
-              
-              <textarea
-                value={communityDraft.message}
-                onChange={(e) => setCommunityDraft((p) => ({ ...p, message: e.target.value }))}
-                placeholder="Share a progress update, encourage peers, or post a workout moment..."
-                rows={3}
-                style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none' }}
-              />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
-                <label className="secondary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', margin: 0, padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}>
-                  <ImageIcon size={16} /> Add photo
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => setCommunityDraft((p) => ({ ...p, image: reader.result }));
-                      reader.readAsDataURL(file);
-                    }
-                  }} />
-                </label>
-
-                <button type="button" className="primary-button" style={{ width: 'auto', padding: '0.55rem 1.25rem', borderRadius: '10px' }} onClick={handleCommunityPostSubmit}>
-                  Post update
-                </button>
-              </div>
-            </div>
-
-            <div className="community-feed" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {communityPosts.map((post) => (
-                <article key={post.id} className="community-post" style={{ padding: '1.25rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-                  <div className="community-post-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: '#0f172a' }}>{post.author}</strong>
-                    <small style={{ color: '#64748b' }}>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : ''}</small>
-                  </div>
-                  <p style={{ margin: 0, color: '#334155', fontSize: '0.95rem', lineHeight: '1.5' }}>{post.message}</p>
-                  {post.image ? <img src={post.image} alt="Community Post" style={{ marginTop: '0.75rem', maxHeight: '280px', width: '100%', borderRadius: '12px', objectFit: 'cover' }} /> : null}
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-      </main>
-
-      {/* MY PROFILE MODAL */}
-      {profileOpen && (
-        <div className="scanner-modal">
-          <div className="scanner-card" style={{ background: '#ffffff', padding: '2rem', borderRadius: '16px', maxWidth: '420px', width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, color: '#0f172a' }}>My Profile</h3>
-              <button type="button" className="secondary-button" onClick={() => setProfileOpen(false)}>Close</button>
-            </div>
-            <form onSubmit={handleProfileSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ textAlign: 'center' }}>
-                {profileDraft.profileImage ? (
-                  <img src={profileDraft.profileImage} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0b41cd' }} />
-                ) : (
-                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#64748b' }}>
-                    <User size={36} />
-                  </div>
-                )}
-                <label className="secondary-button" style={{ marginTop: '0.5rem', display: 'inline-block', cursor: 'pointer', fontSize: '0.85rem' }}>
-                  Upload Picture
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageUpload(e.target.files?.[0])} />
-                </label>
-              </div>
-              <label><span className="input-label">Full Name</span><input type="text" value={profileDraft.fullName} onChange={(e) => setProfileDraft({ ...profileDraft, fullName: e.target.value })} required /></label>
-              <label><span className="input-label">Email</span><input type="email" value={profileDraft.email} onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })} required /></label>
-              <label><span className="input-label">Change Password</span><input type="password" placeholder="Leave blank to keep current" value={profileDraft.password} onChange={(e) => setProfileDraft({ ...profileDraft, password: e.target.value })} /></label>
-              {profileMsg && <p className="auth-message success" style={{ margin: 0 }}>{profileMsg}</p>}
-              <button type="submit" className="primary-button">Save Changes</button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* QR SCANNER MODAL */}
-      {scannerCategoryId && (
-        <div className="scanner-modal">
-          <div className="scanner-card">
-            <button type="button" className="close-scanner" onClick={() => setScannerCategoryId(null)}>Close</button>
-            <video ref={videoRef} className="scanner-video" autoPlay playsInline muted />
-            <canvas ref={canvasRef} hidden />
-            {scannerError && <p className="auth-message error" style={{ marginTop: '0.5rem' }}>{scannerError}</p>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
