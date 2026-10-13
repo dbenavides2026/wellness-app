@@ -569,28 +569,76 @@ export default function App() {
     else if (isSpecial) { Icon = Sparkles; badgeBg = 'rgba(245, 158, 11, 0.12)'; badgeColor = '#b45309'; }
 
     return (
-      <article key={category.id} className="category-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', marginBottom: '1rem' }}>
-        <div className="card-topline" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="category-title-wrap" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+      <article key={category.id} className="category-card">
+        <div className="card-topline">
+          <div className="category-title-wrap">
             <div className="icon-badge" style={{ background: badgeBg, color: badgeColor }}><Icon className="category-icon" /></div>
-            <div><h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.1rem' }}>{category.title}</h2><p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>+{category.points} point{category.points > 1 ? 's' : ''}</p></div>
+            <div>
+              <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{category.title}</h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>+{category.points} point{category.points > 1 ? 's' : ''}</p>
+            </div>
           </div>
-          <span className={`status-pill ${isReady ? 'success' : 'pending'}`}>{isReady ? <CheckCircle2 className="status-icon" /> : <Camera className="status-icon" />}{isReady ? 'Ready' : 'Picture required'}</span>
+          <span className={`status-pill ${isReady ? 'success' : 'pending'}`}>
+            {isReady ? <CheckCircle2 className="status-icon" /> : <Camera className="status-icon" />}
+            {isReady ? 'Ready' : 'Proof required'}
+          </span>
         </div>
-        {category.description && <p style={{ margin: '0.75rem 0 1rem 0', color: '#475569', fontSize: '0.9rem' }}>{category.description}</p>}
-        <div className="method-toggle" style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
-          <button type="button" className={method === 'scan' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'scan' } }))}><ScanLine className="button-icon" /> Scan code</button>
-          <button type="button" className={method === 'upload' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }))}><Upload className="button-icon" /> Upload picture</button>
+        {category.description && <p style={{ margin: '0.85rem 0 1rem 0', color: '#475569', fontSize: '0.9rem' }}>{category.description}</p>}
+        
+        <div className="method-toggle">
+          <button type="button" className={method === 'scan' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'scan' } }))}>
+            <ScanLine className="button-icon" /> Scan code
+          </button>
+          <button type="button" className={method === 'upload' ? 'active' : ''} onClick={() => setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } }))}>
+            <Upload className="button-icon" /> Upload proof
+          </button>
         </div>
+
         {method === 'scan' ? (
-          <div className="scan-box"><button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}><ScanLine className="button-icon" /> Scan code with camera</button></div>
+          <div className="scan-box">
+            <p className="scan-instruction">Scan the QR code for this activity, then log your check-in.</p>
+            <button type="button" className="scan-camera-button" onClick={() => { setFormError(''); setScannerCategoryId(category.id); }}>
+              <ScanLine className="button-icon" /> Scan code with camera
+            </button>
+            <p className="scan-subtext">Point your camera at the QR code for {category.title}.</p>
+          </div>
         ) : (
-          <label className="upload-box"><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { setProofs((prev) => ({ ...prev, [category.id]: URL.createObjectURL(file) })); setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } })); } }} /><span className="upload-hint">{category.proofPrompt || 'Upload a picture.'}</span></label>
+          <label className="upload-box">
+            <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { setProofs((prev) => ({ ...prev, [category.id]: URL.createObjectURL(file) })); setCategorySelections((prev) => ({ ...prev, [category.id]: { method: 'upload' } })); } }} />
+            <span className="upload-hint">{category.proofPrompt || 'Upload a picture of your proof.'}</span>
+          </label>
         )}
-        <button type="button" className="log-button" onClick={() => addStamp(category)} disabled={!canLogActivity}><PlusCircle className="button-icon" /> Log Activity</button>
+
+        <button type="button" className="log-button" onClick={() => addStamp(category)} disabled={!canLogActivity}>
+          <PlusCircle className="button-icon" /> Log Activity
+        </button>
       </article>
     );
   };
+
+  const renderAdminCampaignControls = (campaignStatus, onEnd, onStart, campaignName) => (
+    <div className="campaign-status-card">
+      <div>
+        <span className={`status-badge-pill ${campaignStatus.isActive ? 'status-badge-active' : 'status-badge-ended'}`}>
+          {campaignStatus.isActive ? 'Active Challenge' : 'Ended Challenge'}
+        </span>
+        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
+          {campaignStatus.isActive ? `${campaignName} active` : `${campaignName} currently inactive`}
+        </h2>
+        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+          {campaignStatus.startDate ? `Started: ${new Date(campaignStatus.startDate).toLocaleString()}` : 'Click below to launch campaign.'}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <button type="button" className="secondary-button" style={{ background: '#1e293b', color: '#ffffff', border: 'none' }} onClick={onEnd} disabled={!campaignStatus.isActive}>
+          End Current Campaign
+        </button>
+        <button type="button" className="primary-button" onClick={onStart}>
+          Create New Campaign
+        </button>
+      </div>
+    </div>
+  );
 
   const getTopUsersByFilter = (filterFn) => {
     return participants.map((p) => {
@@ -676,7 +724,6 @@ export default function App() {
           <button type="button" className="logout-button" onClick={handleAdminLogout}><LogOut className="button-icon" /> Log out</button>
         </header>
 
-        {/* HORIZONTAL CARD MENU CONTAINER (MATCHING SECOND PICTURE) */}
         <nav className="nav-card-container">
           <button type="button" className={`nav-pill-item ${adminTab === 'admin' ? 'active' : ''}`} onClick={() => setAdminTab('admin')}>
             <BarChart2 size={18} /> Overview
@@ -889,99 +936,114 @@ export default function App() {
           )}
 
           {adminTab === 'challenge' && (
-            <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ color: '#0f172a', margin: 0 }}>Manage Wellness Challenge</h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="button" className="secondary-button" onClick={handleEndChallenge} disabled={!challengeStatus.isActive}>End Campaign</button>
-                  <button type="button" className="primary-button" onClick={handleStartChallenge}>Start New Campaign</button>
-                </div>
-              </div>
+            <section className="admin-panel special-challenges-panel">
+              {renderAdminCampaignControls(challengeStatus, handleEndChallenge, handleStartChallenge, 'Wellness Challenge Campaign')}
 
-              <p style={{ fontSize: '0.85rem', color: challengeStatus.isActive ? '#15803d' : '#dc2626', fontWeight: 'bold' }}>
-                Campaign Status: {challengeStatus.isActive ? 'Active' : 'Ended (Users blocked from logging activities)'}
-              </p>
-
-              <div className="special-challenges-layout" style={{ marginTop: '1.5rem' }}>
-                <div className="special-challenges-form">
-                  <label><span className="input-label">Activity Name</span><input type="text" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} /></label>
-                  <label><span className="input-label">Description</span><textarea value={challengeForm.description} onChange={(e) => setChallengeForm({ ...challengeForm, description: e.target.value })} /></label>
-                  <label><span className="input-label">Points</span><input type="number" value={challengeForm.points} onChange={(e) => setChallengeForm({ ...challengeForm, points: e.target.value })} /></label>
+              <h4 className="special-activity-section-title">Add Special Activity</h4>
+              <div className="special-activity-grid">
+                <div className="special-activity-form-card">
+                  <label>
+                    <span className="input-label-bold">Activity Name</span>
+                    <input type="text" placeholder="10K Steps Sprint" value={challengeForm.title} onChange={(e) => setChallengeForm({ ...challengeForm, title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Description</span>
+                    <textarea rows={3} placeholder="Describe the challenge and what users need to do." value={challengeForm.description} onChange={(e) => setChallengeForm({ ...challengeForm, description: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Points</span>
+                    <input type="number" value={challengeForm.points} onChange={(e) => setChallengeForm({ ...challengeForm, points: e.target.value })} />
+                  </label>
                   <button type="button" className="primary-button" onClick={handleSaveSpecialChallenge}>Add Special Activity</button>
                 </div>
-                <div className="special-challenges-list">
-                  {specialChallenges.map((ch) => (
-                    <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#0b41cd' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0' }}>{ch.description}</p></div>
-                      <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
-                    </div>
-                  ))}
+
+                <div className="special-activity-list-card">
+                  {specialChallenges.length === 0 ? (
+                    <div className="empty-activity-box">No special activities configured yet.</div>
+                  ) : (
+                    specialChallenges.map((ch) => (
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
+                        <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#0b41cd' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p></div>
+                        <button type="button" className="icon-button delete-button" style={{ color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px' }} onClick={() => handleDeleteSpecialActivity(ch.id)}><Trash2 size={16} /></button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </section>
           )}
 
           {adminTab === 'hiking' && (
-            <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ color: '#0f172a', margin: 0 }}>Manage Hiking Club</h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="button" className="secondary-button" onClick={handleEndHikingSeason} disabled={!hikingStatus.isActive}>End Campaign</button>
-                  <button type="button" className="primary-button" onClick={handleStartHikingSeason}>Start New Campaign</button>
-                </div>
-              </div>
+            <section className="admin-panel special-challenges-panel">
+              {renderAdminCampaignControls(hikingStatus, handleEndHikingSeason, handleStartHikingSeason, 'Hiking Season Campaign')}
 
-              <p style={{ fontSize: '0.85rem', color: hikingStatus.isActive ? '#15803d' : '#dc2626', fontWeight: 'bold' }}>
-                Campaign Status: {hikingStatus.isActive ? 'Active' : 'Ended (Users blocked from logging activities)'}
-              </p>
-
-              <div className="special-challenges-layout" style={{ marginTop: '1.5rem' }}>
-                <div className="special-challenges-form">
-                  <label><span className="input-label">Hike Title</span><input type="text" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} /></label>
-                  <label><span className="input-label">Description</span><textarea value={hikingForm.description} onChange={(e) => setHikingForm({ ...hikingForm, description: e.target.value })} /></label>
-                  <label><span className="input-label">Points</span><input type="number" value={hikingForm.points} onChange={(e) => setHikingForm({ ...hikingForm, points: e.target.value })} /></label>
+              <h4 className="special-activity-section-title">Add Hiking Trail Activity</h4>
+              <div className="special-activity-grid">
+                <div className="special-activity-form-card">
+                  <label>
+                    <span className="input-label-bold">Hike Title</span>
+                    <input type="text" placeholder="Summit Peak Expedition" value={hikingForm.title} onChange={(e) => setHikingForm({ ...hikingForm, title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Description</span>
+                    <textarea rows={3} placeholder="Describe trail requirements and summit check-in instructions." value={hikingForm.description} onChange={(e) => setHikingForm({ ...hikingForm, description: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Points</span>
+                    <input type="number" value={hikingForm.points} onChange={(e) => setHikingForm({ ...hikingForm, points: e.target.value })} />
+                  </label>
                   <button type="button" className="primary-button" onClick={handleSaveHikingChallenge}>Add Hiking Activity</button>
                 </div>
-                <div className="special-challenges-list">
-                  {hikingChallenges.map((ch) => (
-                    <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#15803d' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0' }}>{ch.description}</p></div>
-                      <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
-                    </div>
-                  ))}
+
+                <div className="special-activity-list-card">
+                  {hikingChallenges.length === 0 ? (
+                    <div className="empty-activity-box">No hiking activities configured yet.</div>
+                  ) : (
+                    hikingChallenges.map((ch) => (
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
+                        <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#15803d' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p></div>
+                        <button type="button" className="icon-button delete-button" style={{ color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px' }} onClick={() => handleDeleteHikingActivity(ch.id)}><Trash2 size={16} /></button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </section>
           )}
 
           {adminTab === 'running' && (
-            <section className="admin-panel special-challenges-panel" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ color: '#0f172a', margin: 0 }}>Manage Running Club</h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="button" className="secondary-button" onClick={handleEndRunningSeason} disabled={!runningStatus.isActive}>End Campaign</button>
-                  <button type="button" className="primary-button" onClick={handleStartRunningSeason}>Start New Campaign</button>
-                </div>
-              </div>
+            <section className="admin-panel special-challenges-panel">
+              {renderAdminCampaignControls(runningStatus, handleEndRunningSeason, handleStartRunningSeason, 'Running Season Campaign')}
 
-              <p style={{ fontSize: '0.85rem', color: runningStatus.isActive ? '#15803d' : '#dc2626', fontWeight: 'bold' }}>
-                Campaign Status: {runningStatus.isActive ? 'Active' : 'Ended (Users blocked from logging activities)'}
-              </p>
-
-              <div className="special-challenges-layout" style={{ marginTop: '1.5rem' }}>
-                <div className="special-challenges-form">
-                  <label><span className="input-label">Run Title</span><input type="text" value={runningForm.title} onChange={(e) => setRunningForm({ ...runningForm, title: e.target.value })} /></label>
-                  <label><span className="input-label">Description</span><textarea value={runningForm.description} onChange={(e) => setRunningForm({ ...runningForm, description: e.target.value })} /></label>
-                  <label><span className="input-label">Points</span><input type="number" value={runningForm.points} onChange={(e) => setRunningForm({ ...runningForm, points: e.target.value })} /></label>
+              <h4 className="special-activity-section-title">Add Running Session Activity</h4>
+              <div className="special-activity-grid">
+                <div className="special-activity-form-card">
+                  <label>
+                    <span className="input-label-bold">Run Title</span>
+                    <input type="text" placeholder="5K Sunrise Interval" value={runningForm.title} onChange={(e) => setRunningForm({ ...runningForm, title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Description</span>
+                    <textarea rows={3} placeholder="Describe run route and completion proof instructions." value={runningForm.description} onChange={(e) => setRunningForm({ ...runningForm, description: e.target.value })} />
+                  </label>
+                  <label>
+                    <span className="input-label-bold">Points</span>
+                    <input type="number" value={runningForm.points} onChange={(e) => setRunningForm({ ...runningForm, points: e.target.value })} />
+                  </label>
                   <button type="button" className="primary-button" onClick={handleSaveRunningChallenge}>Add Running Activity</button>
                 </div>
-                <div className="special-challenges-list">
-                  {runningChallenges.map((ch) => (
-                    <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#b45309' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0' }}>{ch.description}</p></div>
-                      <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteRunningActivity(ch.id)}><Trash2 size={16} /></button>
-                    </div>
-                  ))}
+
+                <div className="special-activity-list-card">
+                  {runningChallenges.length === 0 ? (
+                    <div className="empty-activity-box">No running activities configured yet.</div>
+                  ) : (
+                    runningChallenges.map((ch) => (
+                      <div key={ch.id} className="admin-community-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid #e2e8f0' }}>
+                        <div><strong style={{ color: '#0f172a' }}>{ch.title}</strong> <small style={{ color: '#b45309' }}>({ch.points} pts)</small><p style={{ color: '#475569', margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>{ch.description}</p></div>
+                        <button type="button" className="icon-button delete-button" style={{ color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.4rem', borderRadius: '6px' }} onClick={() => handleDeleteRunningActivity(ch.id)}><Trash2 size={16} /></button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </section>
@@ -1021,7 +1083,7 @@ export default function App() {
                               <strong style={{ color: '#0f172a' }}>{post.author} <small style={{ color: '#64748b' }}>({post.isAnnouncement ? 'Announcement' : 'User post'})</small></strong>
                               <div style={{ display: 'flex', gap: '0.25rem' }}>
                                 <button type="button" className="icon-button edit-button" onClick={() => { setEditingCommunityId(post.id); setEditingCommunityDraft({ message: post.message }); }}><Edit size={14} /></button>
-                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={14} /></button>
+                                <button type="button" className="icon-button delete-button" style={{ color: '#dc2626' }} onClick={() => handleDeleteCommunityPost(post.id)}><Trash2 size={16} /></button>
                               </div>
                             </div>
                             <p style={{ margin: 0, color: '#334155' }}>{post.message}</p>
@@ -1066,7 +1128,7 @@ export default function App() {
   // FRONTEND USER PORTAL
   return (
     <div className="wellness-app">
-      <header className="passport-top-bar" style={{ padding: '1rem 2rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="passport-top-bar">
         <h1 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>Wellness Passport</h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button type="button" className="secondary-button" onClick={() => setProfileOpen(true)}><User size={16} /> My Profile</button>
@@ -1074,7 +1136,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* HORIZONTAL CARD MENU CONTAINER (MATCHING SECOND PICTURE) */}
       <nav className="nav-card-container">
         <button type="button" className={`nav-pill-item ${activePortalTab === 'home' ? 'active' : ''}`} onClick={() => setActivePortalTab('home')}>
           <HomeIcon size={18} /> Home
