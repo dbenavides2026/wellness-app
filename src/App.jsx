@@ -101,8 +101,11 @@ export default function App() {
   const [showProfilePassword, setShowProfilePassword] = useState(false);
 
   const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
+  
+  // Pestañas activas independientes de la sincronización en segundo plano
   const [activePortalTab, setActivePortalTab] = useState('home');
   const [adminTab, setAdminTab] = useState('admin');
+  
   const [authMessage, setAuthMessage] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
@@ -114,12 +117,12 @@ export default function App() {
   const [runningChallenges, setRunningChallenges] = useState([]);
   const [runningStatus, setRunningStatus] = useState({ isActive: false, title: 'No active running season' });
 
-  // Campaign Date Form State
+  // Fechas de campañas
   const [challengeDates, setChallengeDates] = useState({ startDate: '', endDate: '' });
   const [hikingDates, setHikingDates] = useState({ startDate: '', endDate: '' });
   const [runningDates, setRunningDates] = useState({ startDate: '', endDate: '' });
 
-  // Special Activity Form State
+  // Formulario de actividades especiales
   const [challengeForm, setChallengeForm] = useState({ title: '', description: '', points: 10, eventDate: '', scanCode: '', proofPrompt: '' });
   const [hikingForm, setHikingForm] = useState({ title: '', description: '', points: 15, eventDate: '', scanCode: '', proofPrompt: '' });
   const [runningForm, setRunningForm] = useState({ title: '', description: '', points: 12, eventDate: '', scanCode: '', proofPrompt: '' });
@@ -179,6 +182,7 @@ export default function App() {
       if (currentUser?.id) {
         const freshUser = updatedParticipants.find((p) => p.id === currentUser.id);
         if (freshUser) {
+          // Solo actualiza si los sellos o puntos realmente cambiaron
           setCurrentUser(prev => JSON.stringify(prev) === JSON.stringify(freshUser) ? prev : freshUser);
         }
       }
@@ -195,7 +199,6 @@ export default function App() {
       setAdminQrCodes(qrs.qrCodes || []);
     } catch (e) {
       console.error('Admin QR fetch error', e);
-      // Fallback local list if API fails
       const fallbackList = [
         { id: 'gym', title: 'Gym / Solo Workout', scanCode: 'WELLNESS-GYM-101' },
         { id: 'group', title: 'Group Fitness Class', scanCode: 'WELLNESS-GROUP-202' },
@@ -230,7 +233,6 @@ export default function App() {
     refreshAllData();
     if (adminUser || screen === 'admin-dashboard') {
       refreshAdminData();
-      if (adminTab === 'qr') fetchAdminQrCodes();
     }
 
     const interval = setInterval(() => {
@@ -1024,7 +1026,7 @@ export default function App() {
       ? (s) => s.scanCode?.startsWith('RUNNING-')
       : () => true;
 
-    // Direct inline QR list fallback for catalog display
+    // Catálogo QR garantizado con SVG dinámico en cliente
     const currentCatalogQrs = adminQrCodes.length > 0 ? adminQrCodes : [
       { id: 'gym', title: 'Gym / Solo Workout', scanCode: 'WELLNESS-GYM-101' },
       { id: 'group', title: 'Group Fitness Class', scanCode: 'WELLNESS-GROUP-202' },
