@@ -1302,7 +1302,7 @@ function sidebarButtonStyle(isActive) {
   return {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.65rem',
     padding: '0.75rem 1rem',
     borderRadius: '8px',
     border: 'none',
@@ -1313,6 +1313,6 @@ function sidebarButtonStyle(isActive) {
     cursor: 'pointer',
     textAlign: 'left',
     transition: 'all 0.2s ease',
-    width: '100%'
+    flexShrink: 0
   };
 }
